@@ -2,6 +2,11 @@
 
 This file provides context for AI agents working in repos that build on Konflux.
 
+## Contributing to This Repo
+
+- **`recipes/`** are the primary documentation. They must always be human-readable -- written for people to follow manually, not just for agents to parse. When adding or updating a recipe, prioritize clarity for a human reader.
+- **`skills/`** are agent automation that references recipes. Skills should be thin wrappers -- the recipe is the source of truth for the procedure.
+
 ## Key Concepts
 
 - **Konflux** uses Tekton Pipelines-as-Code. PipelineRuns live in `.tekton/` directories and are triggered by GitHub events (push, pull_request) or PR comments.
