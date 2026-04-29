@@ -1,0 +1,5 @@
+{
+  "name": "konflux-cookbook",
+  "description": "A collection of tools and recipes for getting builds working on Konflux",
+  "version": "0.1.0"
+}
