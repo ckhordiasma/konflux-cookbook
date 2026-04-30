@@ -98,7 +98,7 @@ Update the following params:
 
 # After
 - name: output-image
-  value: 'quay.io/redhat-user-workloads/rhoai-tenant/pull-request-pipelines/<component>:on-pr-{{revision}}'
+  value: 'quay.io/rhoai/pull-request-pipelines:<component>-{{revision}}'
 ```
 
 **image-expires-after** -- add an expiration so test images don't accumulate:
@@ -198,7 +198,7 @@ spec:
 - name: revision
   value: '{{revision}}'
 - name: output-image
-  value: 'quay.io/redhat-user-workloads/rhoai-tenant/pull-request-pipelines/odh-cli:on-pr-{{revision}}'
+  value: 'quay.io/rhoai/pull-request-pipelines:odh-cli-{{revision}}'
 - name: image-expires-after
   value: 5d
 - name: enable-slack-failure-notification
