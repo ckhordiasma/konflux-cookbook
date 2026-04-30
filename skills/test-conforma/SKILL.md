@@ -30,7 +30,7 @@ Read the reference doc at `guides/test-conforma.md` (relative to the plugin root
 
 4. **Find the latest snapshot**: Run `oc get snapshots` with the label selectors from the guide to find the latest push snapshot. Show the snapshot name to the user and ask them to confirm it's the right one. If the user already knows the snapshot name, skip the lookup.
 
-5. **Download and filter the snapshot**: Run `oc get snapshot <name> -o json` and pipe through `jq` to filter out FBC fragment components. Save to a temp file. Report the component count to the user.
+5. **Download and filter the snapshot**: Run `oc get snapshot <name> -o json` and pipe through `jq` to filter out FBC fragment components. If the user wants to validate only specific components, ask for a regex pattern and add a second `jq` select to filter by component name (see the guide for the syntax). Save to a temp file. Report the component count to the user.
 
 6. **Verify the snapshot**: Check that `.spec.application` in the downloaded JSON matches the expected application name. If it doesn't match, warn the user and stop.
 

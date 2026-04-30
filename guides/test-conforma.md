@@ -91,6 +91,15 @@ oc get snapshot $SNAPSHOT -o json \
   > snapshot.json
 ```
 
+To validate only specific components, add a regex filter on the component name. For example, to validate only components whose name contains `odh-notebook`:
+
+```bash
+oc get snapshot $SNAPSHOT -o json \
+  | jq '.spec.components |= [.[] | select(.name | test("fbc-fragment") | not)]
+        | .spec.components |= [.[] | select(.name | test("odh-notebook"))]' \
+  > snapshot.json
+```
+
 Check how many components are in the snapshot:
 
 ```bash

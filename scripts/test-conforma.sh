@@ -9,6 +9,7 @@ Run EC validation against a Konflux snapshot or a single container image.
 Options:
   -a, --application APP   Konflux application name (e.g. rhoai-v3-4)
   -i, --image IMAGE       Single container image reference (e.g. quay.io/org/image:tag)
+  -f, --filter REGEX      Regex filter on component names (snapshot mode only)
   -s, --snapshot NAME     Snapshot name (default: latest push snapshot)
   -p, --policy FILE       Policy file or k8s ref (default: registry-rhoai-prod.yaml)
   -o, --output FILE       Results output file (default: ec-report-APP-POLICY.yaml)
@@ -20,7 +21,7 @@ Options:
 Either -a/--application or -i/--image is required.
 
 All options can also be set via environment variables:
-  APPLICATION, IMAGE, SNAPSHOT, POLICY_FILE, RESULTS_FILE, WORKERS, PUBKEY, VERBOSE
+  APPLICATION, IMAGE, FILTER, SNAPSHOT, POLICY_FILE, RESULTS_FILE, WORKERS, PUBKEY, VERBOSE
 EOF
 }
 
@@ -28,6 +29,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     -a|--application) APPLICATION="$2"; shift 2 ;;
     -i|--image)       IMAGE="$2"; shift 2 ;;
+    -f|--filter)      FILTER="$2"; shift 2 ;;
     -s|--snapshot)    SNAPSHOT="$2"; shift 2 ;;
     -p|--policy)      POLICY_FILE="$2"; shift 2 ;;
     -o|--output)      RESULTS_FILE="$2"; shift 2 ;;
@@ -110,9 +112,17 @@ else
 
   echo "=== Downloading snapshot JSON ==="
   SECONDS=0
-  oc get snapshot $SNAPSHOT -o json | jq '.spec.components |= [.[] | select(.name | test("fbc-fragment") | not)]' > $SNAPSHOT_FILE
+  JQ_FILTER='.spec.components |= [.[] | select(.name | test("fbc-fragment") | not)]'
+  if [ -n "$FILTER" ]; then
+    JQ_FILTER="$JQ_FILTER | .spec.components |= [.[] | select(.name | test(\"$FILTER\"))]"
+  fi
+  oc get snapshot $SNAPSHOT -o json | jq "$JQ_FILTER" > $SNAPSHOT_FILE
   COMPONENT_COUNT=$(jq '.spec.components | length' "$SNAPSHOT_FILE")
-  echo "Components: $COMPONENT_COUNT (${SECONDS}s)"
+  if [ -n "$FILTER" ]; then
+    echo "Components: $COMPONENT_COUNT matching /$FILTER/ (${SECONDS}s)"
+  else
+    echo "Components: $COMPONENT_COUNT (${SECONDS}s)"
+  fi
 
   SNAPSHOT_APP=$(jq -r '.spec.application' "$SNAPSHOT_FILE")
   if [ "$SNAPSHOT_APP" != "$APPLICATION" ]; then
