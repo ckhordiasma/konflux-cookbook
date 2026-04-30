@@ -1,10 +1,32 @@
 #!/usr/bin/env python3
 
+import argparse
 import os
 import subprocess
 import sys
 
 import yaml
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Compare two Conforma (Enterprise Contract) policies against the same snapshot."
+    )
+    parser.add_argument("--application", default=os.environ.get("APPLICATION", "rhoai-v2-25"),
+                        help="Application name (default: $APPLICATION or rhoai-v2-25)")
+    parser.add_argument("--policy-a", default=os.environ.get("POLICY_A"),
+                        help="First policy file to compare (default: $POLICY_A)")
+    parser.add_argument("--policy-b", default=os.environ.get("POLICY_B"),
+                        help="Second policy file to compare (default: $POLICY_B)")
+    parser.add_argument("--snapshot", default=os.environ.get("SNAPSHOT", ""),
+                        help="Snapshot to validate (default: $SNAPSHOT)")
+    parser.add_argument("--workers", default=os.environ.get("WORKERS", "25"),
+                        help="Number of parallel workers (default: $WORKERS or 25)")
+    parser.add_argument("--pubkey", default=os.environ.get("PUBKEY", ""),
+                        help="Public key for signature verification (default: $PUBKEY)")
+    parser.add_argument("--verbose", action="store_true", default=bool(os.environ.get("VERBOSE")),
+                        help="Enable verbose output (default: $VERBOSE)")
+    return parser.parse_args()
 
 
 def start_conforma(application, policy_file, results_file, env_passthrough, stderr_file):
@@ -112,19 +134,24 @@ def print_diffs(ra, rb):
 
 
 def main():
-    application = os.environ.get("APPLICATION", "rhoai-v2-25")
-    policy_a = os.environ.get("POLICY_A", "registry-rhoai-prod.yaml")
-    policy_b = os.environ.get("POLICY_B", "registry-rhoai-prod.yaml")
+    args = parse_args()
+    application = args.application
+    policy_a = args.policy_a
+    policy_b = args.policy_b
+
+    if not policy_a or not policy_b:
+        print("ERROR: Both --policy-a and --policy-b are required.")
+        sys.exit(1)
 
     if policy_a == policy_b:
-        print(f"ERROR: POLICY_A and POLICY_B are the same: {policy_a}")
+        print(f"ERROR: --policy-a and --policy-b are the same: {policy_a}")
         sys.exit(1)
 
     env_passthrough = {
-        "SNAPSHOT": os.environ.get("SNAPSHOT", ""),
-        "WORKERS": os.environ.get("WORKERS", "25"),
-        "VERBOSE": os.environ.get("VERBOSE", ""),
-        "PUBKEY": os.environ.get("PUBKEY", ""),
+        "SNAPSHOT": args.snapshot,
+        "WORKERS": args.workers,
+        "VERBOSE": "1" if args.verbose else "",
+        "PUBKEY": args.pubkey,
     }
 
     results_a = f"ec-report-{application}-policy-a.yaml"
