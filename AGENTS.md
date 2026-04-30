@@ -6,6 +6,7 @@ This file provides context for AI agents working in repos that build on Konflux.
 
 - **`guides/`** are the primary documentation. They must always be human-readable -- written for people to follow manually, not just for agents to parse. When adding or updating a guide, prioritize clarity for a human reader.
 - **`skills/`** are agent automation that references guides. Skills should be thin wrappers -- the guide is the source of truth for the procedure.
+- **`scripts/`** are runnable implementations of what the guides describe. When updating a guide, check if there is a corresponding script in `scripts/` and keep them in sync. The same applies in reverse -- script changes should be reflected in the guide.
 
 ## Key Concepts
 

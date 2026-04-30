@@ -1,6 +1,6 @@
-# How to Run Conforma (Enterprise Contract) Validation Against a Konflux Snapshot
+# How to Run Conforma (Enterprise Contract) Validation
 
-This guide walks through running Enterprise Contract (EC) validation against a Konflux snapshot to check whether your built images comply with a release policy.
+This guide walks through running Enterprise Contract (EC) validation to check whether your built images comply with a release policy. You can validate either a full Konflux snapshot (all components in an application) or a single container image.
 
 ## Why
 
@@ -15,11 +15,43 @@ Before images can ship through a release pipeline, they must pass Conforma (Ente
 
 You need the following tools installed and configured:
 
-- **`oc`** -- OpenShift CLI, logged into the Konflux cluster
+- **`oc`** -- OpenShift CLI, logged into the Konflux cluster (only needed for snapshot-based validation)
 - **`ec`** -- [Enterprise Contract CLI](https://github.com/enterprise-contract/ec-cli)
-- **`jq`** -- JSON processor
+- **`jq`** -- JSON processor (only needed for snapshot-based validation)
 
-## Steps
+## Option A: Validate a single image
+
+If you just want to check one container image against a policy, you can skip the snapshot steps entirely.
+
+### 1. Run EC validation against the image
+
+```bash
+ec validate image \
+  --ignore-rekor true \
+  --image quay.io/your-org/your-image:tag \
+  --public-key k8s://openshift-pipelines/public-key \
+  --policy registry-rhoai-prod.yaml \
+  --info \
+  --output yaml \
+  --timeout 30m0s
+```
+
+Replace `--image` with the full image reference (including tag or digest). You can also use a digest reference like `quay.io/your-org/your-image@sha256:abc123...`.
+
+### 2. Review the results
+
+Check the exit code:
+
+- **0** -- the image passed policy validation
+- **non-zero** -- the image failed
+
+The YAML output contains the detailed results. Add `--verbose` for more detail when debugging failures.
+
+---
+
+## Option B: Validate a full snapshot
+
+Use this when you want to validate all components in a Konflux application at once.
 
 ### 1. Choose your application
 

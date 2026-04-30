@@ -19,7 +19,7 @@ konflux-cookbook/
 | Guide | Description |
 |-------|-------------|
 | [create-pr-pipeline](guides/create-pr-pipeline.md) | Create a temporary pull request PipelineRun from a push PipelineRun to test build changes on an RHOAI release branch |
-| [test-conforma](guides/test-conforma.md) | Run Conforma (Enterprise Contract) validation against a Konflux snapshot to check release policy compliance |
+| [test-conforma](guides/test-conforma.md) | Run Conforma (Enterprise Contract) validation against a single image or Konflux snapshot to check release policy compliance |
 
 ## Using as a Claude Code plugin
 
