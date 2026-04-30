@@ -96,7 +96,11 @@ if [ -n "$IMAGE" ]; then
   echo "Exit code:  $EC_EXIT"
 else
   # Snapshot mode
-  RESULTS_FILE=${RESULTS_FILE:-ec-report-${APPLICATION}-${POLICY_STEM}.yaml}
+  FILTER_SUFFIX=""
+  if [ -n "$FILTER" ]; then
+    FILTER_SUFFIX="-filtered"
+  fi
+  RESULTS_FILE=${RESULTS_FILE:-ec-report-${APPLICATION}-${POLICY_STEM}${FILTER_SUFFIX}.yaml}
 
   echo "=== Fetching snapshot ==="
   SECONDS=0
