@@ -105,7 +105,7 @@ else
   echo "=== Fetching snapshot ==="
   SECONDS=0
   if [ -z "$SNAPSHOT" ]; then
-    SNAPSHOT=$(oc get snapshots -l "pac.test.appstudio.openshift.io/event-type in (push, Push),appstudio.openshift.io/application=$APPLICATION" --sort-by=.metadata.creationTimestamp | tail -1 | awk '{print $1}')
+    SNAPSHOT=$(oc get snapshots -l "pac.test.appstudio.openshift.io/event-type notin (pull_request),appstudio.openshift.io/application=$APPLICATION" --sort-by=.metadata.creationTimestamp | tail -1 | awk '{print $1}')
   fi
   echo "Snapshot: $SNAPSHOT (${SECONDS}s)"
 
