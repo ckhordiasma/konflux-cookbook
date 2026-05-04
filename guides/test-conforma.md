@@ -61,13 +61,13 @@ Identify the Konflux application you want to validate. This is the application n
 APPLICATION=rhoai-v3-4
 ```
 
-### 2. Find the latest push snapshot
+### 2. Find the latest snapshot
 
-Snapshots are created by Konflux after successful builds. To find the most recent push snapshot for your application:
+Snapshots are created by Konflux after successful builds or component changes. To find the most recent snapshot for your application:
 
 ```bash
 oc get snapshots \
-  -l "pac.test.appstudio.openshift.io/event-type in (push, Push),appstudio.openshift.io/application=$APPLICATION" \
+  -l "pac.test.appstudio.openshift.io/event-type notin (pull_request),appstudio.openshift.io/application=$APPLICATION" \
   --sort-by=.metadata.creationTimestamp
 ```
 
@@ -78,7 +78,7 @@ SNAPSHOT=<name-from-output>
 ```
 
 The label selectors filter for:
-- `pac.test.appstudio.openshift.io/event-type in (push, Push)` -- only snapshots created by push (post-merge) builds, not pull request builds
+- `pac.test.appstudio.openshift.io/event-type notin (pull_request)` -- excludes pull request snapshots while including push snapshots and snapshots created without an event-type label (e.g. component removals)
 - `appstudio.openshift.io/application=$APPLICATION` -- only snapshots for your application
 
 ### 3. Download and filter the snapshot

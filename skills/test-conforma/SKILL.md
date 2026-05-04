@@ -28,7 +28,7 @@ Read the reference doc at `guides/test-conforma.md` (relative to the plugin root
 
 3. **Ask for the policy**: Ask which policy to validate against. Default to `registry-rhoai-prod.yaml` if they don't have a preference. The policy can be a local YAML file or a Kubernetes reference.
 
-4. **Find the latest snapshot**: Run `oc get snapshots` with the label selectors from the guide to find the latest push snapshot. Show the snapshot name to the user and ask them to confirm it's the right one. If the user already knows the snapshot name, skip the lookup.
+4. **Find the latest snapshot**: Run `oc get snapshots` with the label selectors from the guide to find the latest snapshot (excluding pull request snapshots). Show the snapshot name to the user and ask them to confirm it's the right one. If the user already knows the snapshot name, skip the lookup.
 
 5. **Download and filter the snapshot**: Run `oc get snapshot <name> -o json` and pipe through `jq` to filter out FBC fragment components. If the user wants to validate only specific components, ask for a regex pattern and add a second `jq` select to filter by component name (see the guide for the syntax). Save to a temp file. Report the component count to the user.
 
