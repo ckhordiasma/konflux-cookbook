@@ -17,7 +17,9 @@ This mounts your project directory into the container so Hermeto can read lockfi
 
 ## Configuring `.hermeto.json`
 
-The hermeto config file defines which package managers to prefetch and how. It is a JSON array of package manager objects, each with a `type` field and manager-specific options. You can pass this config inline on the command line or save it to a file (conventionally `.hermeto.json`):
+The hermeto config defines which package managers to prefetch and how. It is a JSON array of package manager objects, each with a `type` field and manager-specific options. In this guide, we save it to a file called `.hermeto.json` for local testing, but in your Konflux build pipeline the JSON is typically inlined as a parameter to the prefetch task.
+
+For local testing:
 
 ```bash
 hermeto fetch-deps \
