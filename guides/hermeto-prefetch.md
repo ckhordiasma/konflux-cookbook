@@ -54,18 +54,7 @@ A typical multi-manager config:
 
 Hermeto requires a fully resolved `requirements.txt` with all transitive dependencies pinned to exact versions (e.g., `package==1.2.3`). Hashes are optional but recommended for PyPI packages, and mandatory for HTTPS URL dependencies. See [Python Requirements](#python-requirements) for how to generate these files.
 
-Some packages have neither wheels nor sdists on PyPI for a given architecture -- this is common on ppc64le and s390x. For these, use PEP 440 direct references in your requirements file to point at an alternative source:
-
-```
-# HTTPS URL (hash required)
-package-name @ https://example.com/path/to/archive.tar.gz \
-    --hash=sha256:abcdef1234567890
-
-# Git URL (must use a full commit hash, incompatible with --hash)
-package-name @ git+https://github.com/user/repo@full_commit_hash
-```
-
-Note that git dependencies are incompatible with pip's hash-checking mode -- if any dependency uses `--hash`, pip requires hashes for all entries. Use HTTPS URLs instead when possible.
+Some packages lack wheels or sdists on PyPI for certain architectures -- this is common on ppc64le and s390x. See [Using AIPCC Wheels](#using-aipcc-wheels) for access to pre-built wheels, or [Building from Source for Missing Architectures](#building-from-source-for-missing-architectures) for building packages like torch from source tarballs.
 
 **Config fields:**
 
