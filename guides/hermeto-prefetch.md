@@ -445,7 +445,7 @@ This produces a file with cmake, ninja, numpy, cython, and other build backends 
 torch==2.11.0
 ```
 
-Compile as normal with `uv pip compile`. The output `requirements.txt` will have `torch==2.11.0` as a version pin, not a URL reference.
+Compile as normal with `uv pip compile`. The output `requirements.txt` will have `torch==2.11.0` as a version pin, not a URL reference. This ensures hermeto prefetches the PyPI wheels for architectures that have them (x86_64, aarch64).
 
 **4. Configure hermeto to fetch both wheels and the source tarball:**
 
