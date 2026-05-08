@@ -396,14 +396,53 @@ Match the `--python` version to your target image. This file is needed if any of
 
 ### Using AIPCC wheels
 
-```
-uv pip compile pyproject.toml --python-platform linux  --index https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9-test/simple/ --index-strategy first-index --emit-index-annotation
+[AIPCC](https://packages.redhat.com/domains/public-rhai/distributions) (AI Platform Core Components) publishes prebuilt Python wheels for all target architectures (x86_64, aarch64, ppc64le, s390x) and accelerator variants (CPU, CUDA, ROCm). Using AIPCC wheels eliminates the need to build packages from source on architectures that lack public PyPI wheels. Several RHOAI components already use AIPCC, including notebooks, mlflow, and mlserver.
+
+**Important:** AIPCC wheels are built with external dependencies on system libraries installed in the corresponding AIPCC base images. Unlike upstream `manylinux` wheels which bundle their dependencies, AIPCC wheels will not work without the matching base image. Do not mix AIPCC wheels with wheels from pypi.org -- ABI incompatibilities between bundled and external dependencies can cause crashes, incorrect output, or libraries that fail to load. Each AIPCC index must be used with its corresponding base image. Pure-Python packages from PyPI are lower risk to mix in since they have no compiled components, but this is unsupported by AIPCC -- if a package you need is missing, [request it](#requesting-packages) instead.
+
+> **Note:** Some components (e.g., mlflow) temporarily prefetch a small number of packages from public PyPI alongside AIPCC -- typically pure-Python packages or compiled extensions that don't touch the accelerator stack (e.g., `psycopg2`). This can work as a short-term workaround, but the proper fix is to get the missing packages added to AIPCC so everything comes from a single, supported index.
+
+AIPCC provides separate indexes per RHOAI release and accelerator variant. Browse available indexes at [packages.redhat.com](https://packages.redhat.com/domains/public-rhai/distributions). For RHOAI 3.4:
+
+| Variant | Index URL | Base Image |
+|---------|-----------|------------|
+| CPU | `.../rhoai/3.4/cpu-ubi9/simple/` | `quay.io/aipcc/base-images/cpu:3.4.0-...` |
+| CUDA 12.9 | `.../rhoai/3.4/cuda12.9-ubi9/simple/` | `quay.io/aipcc/base-images/cuda-12.9-el9.6:3.4.0-...` |
+| CUDA 13.0 | `.../rhoai/3.4/cuda13.0-ubi9/simple/` | `quay.io/aipcc/base-images/cuda-13.0-el9.6:3.4.0-...` |
+| ROCm 6.4 | `.../rhoai/3.4/rocm6.4-ubi9/simple/` | `quay.io/aipcc/base-images/rocm-6.4-el9.6:3.4.0-...` |
+
+The full index URL prefix is `https://console.redhat.com/api/pypi/public-rhai/`. The base images are pre-configured so that `pip` and `uv` pull from the matching index automatically.
+
+To request a new package or version, use the [AIPCC package request form](https://dashboard.aipcc.redhat.com/package-request) or file a Jira under [AIPCC-1](https://issues.redhat.com/browse/AIPCC-1).
+
+**Compiling requirements against AIPCC:**
+
+Point `uv pip compile` at the AIPCC index with `--index` and `--index-strategy first-index`. Add `--emit-index-annotation` to record which index each package came from:
+
+```bash
+uv pip compile requirements.in \
+  --python-platform linux \
+  --python-version 3.12 \
+  --index https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9/simple/ \
+  --index-strategy first-index \
+  --emit-index-annotation \
+  -o requirements.txt
 ```
 
-If you want to include extras, add them as command flags:
+If your project uses extras:
+```bash
+uv pip compile pyproject.toml \
+  --python-platform linux \
+  --extra server --extra tracing \
+  --index https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9/simple/ \
+  --index-strategy first-index \
+  --emit-index-annotation \
+  -o requirements.txt
 ```
-uv pip compile pyproject.toml --python-platform linux --extra sdd --extra jailbreak --extra openai --extra nvidia --extra tracing --extra models --extra multilingual --extra server  --index https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9-test/simple/ --index-strategy first-index --emit-index-annotation
-```
+
+**Multi-variant builds:**
+
+For components that build for multiple accelerators (CPU, CUDA, ROCm), maintain separate requirements files per variant (e.g., `requirements.cpu.txt`, `requirements.cuda.txt`) and use build-args to select the right one at build time. The notebooks component uses this pattern with a `build-args/konflux.{variant}.conf` file that sets the index URL and base image.
 
 ### Building from source for missing architectures
 
