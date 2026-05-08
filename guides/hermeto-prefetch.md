@@ -52,7 +52,7 @@ A typical multi-manager config:
 
 [Hermeto pip docs](https://hermetoproject.github.io/hermeto/latest/pip/)
 
-Hermeto requires a fully resolved `requirements.txt` with all transitive dependencies pinned to exact versions (e.g., `package==1.2.3`). Hashes are optional but recommended for PyPI packages, and mandatory for HTTPS URL dependencies. See [Python Requirements](#python-requirements) for how to generate these files.
+Hermeto requires a fully resolved `requirements.txt` with all transitive dependencies pinned to exact versions (e.g., `package==1.2.3`). Hashes are optional but recommended for PyPI packages, and mandatory for HTTPS URL dependencies. If any of your dependencies are sdists (no pre-built wheel available), you also need a `requirements-build.txt` listing their PEP 517 build backends. See [Python Requirements](#python-requirements) for how to generate these files.
 
 Some packages lack wheels or sdists on PyPI for certain architectures -- this is common on ppc64le and s390x. See [Using AIPCC Wheels](#using-aipcc-wheels) for access to pre-built wheels, or [Building from Source for Missing Architectures](#building-from-source-for-missing-architectures) for building packages like torch from source tarballs.
 
