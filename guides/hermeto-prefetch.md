@@ -153,7 +153,7 @@ The `build` target only requires `podman` -- it doesn't need `uv` or other tools
 
 ### pip (Python)
 
-Hermeto requires a fully resolved `requirements.txt` with pinned versions and index annotations.
+Hermeto requires a fully resolved `requirements.txt` with all transitive dependencies pinned to exact versions (e.g., `package==1.2.3`). Hashes are strongly recommended but optional for PyPI packages. For dependencies fetched via HTTPS URLs, exactly one `--hash` is required.
 
 #### Compiling requirements with uv
 
@@ -164,11 +164,10 @@ uv pip compile requirements.in \
   --python-platform linux \
   --python-version 3.9 \
   --index-strategy first-index \
-  --emit-index-annotation \
   -o requirements.txt
 ```
 
-The `--emit-index-annotation` flag adds index comments that Hermeto needs to locate packages from custom indexes (like AIPCC).
+If you use a custom package index (like AIPCC), add `--emit-index-annotation` so the compiled file records which index each package came from. You can also use `--index-url` in the requirements file or pass `--index` to uv to specify the index.
 
 #### Build dependencies for source distributions
 
@@ -183,20 +182,27 @@ Match the `--python` version to your target image. If you enable binary wheels (
 
 #### Using binary wheels
 
-To download prebuilt binary wheels instead of source distributions, add a `binary` section to your hermeto config. This avoids needing Rust/C toolchains to compile packages like `pydantic-core` or `cryptography`:
+By default, hermeto fetches only source distributions (sdists). To download prebuilt binary wheels instead, add a `binary` section to your hermeto config. This avoids needing Rust/C toolchains to compile packages like `pydantic-core` or `cryptography`.
+
+To prefer wheels for all packages (falling back to sdists when no wheel is available):
 
 ```json
 {
   "type": "pip",
   "path": ".",
   "requirements_files": ["requirements.txt"],
+  "requirements_build_files": ["requirements-build.txt"],
   "binary": {
     "arch": "x86_64,aarch64,ppc64le,s390x"
   }
 }
 ```
 
-List all architectures you build for, comma-separated. When using binary wheels, you can usually omit `requirements_build_files` since the wheels ship precompiled.
+List all architectures you build for, comma-separated. The `packages` field defaults to `:all:`, which means "try wheels for everything, fall back to sdists." If you name specific packages instead (e.g., `"packages": "pydantic-core,cryptography"`), hermeto will *fail* if no matching wheel exists for those packages.
+
+Other available filter fields: `os` (default `"linux"`), `py_version` (e.g., `312` for Python 3.12), `py_impl` (default `"cp"`), `abi`, `platform` (regex).
+
+Even with binary wheels enabled, keep `requirements_build_files` -- not all packages publish wheels for every architecture (e.g., ppc64le, s390x), so hermeto will fall back to building from source and needs the build dependencies.
 
 #### Fetching pip dependencies
 
@@ -214,7 +220,7 @@ hermeto fetch-deps \
   }'
 ```
 
-**Wheel filtering** -- to prefetch binary wheels for a specific platform instead of only sdists:
+**Wheel filtering** -- to require binary wheels for specific packages (fails if no matching wheel exists):
 
 ```bash
 hermeto fetch-deps \
