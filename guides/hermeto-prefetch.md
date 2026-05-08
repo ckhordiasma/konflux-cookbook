@@ -102,7 +102,12 @@ By default, hermeto fetches only source distributions (sdists). Add a `binary` o
 
 The key fields are `packages` (comma-separated names, or `:all:` to try wheels for everything) and `arch` (comma-separated architectures, default `"x86_64"`). When `packages` is `:all:` (the default), hermeto prefers wheels but falls back to sdists. When you name specific packages, hermeto *fails* if no matching wheel exists. See the [hermeto pip docs](https://hermetoproject.github.io/hermeto/latest/pip/) for additional filter fields (`os`, `py_version`, `py_impl`, `abi`, `platform`).
 
-`requirements_build_files` is needed if any of your dependencies are installed from source distributions (sdists). If you are building for ppc64le or s390x, many packages do not publish prebuilt wheels on PyPI for those architectures, so a requirements-build file is likely needed.
+`requirements_build_files` is needed if any of your dependencies are installed from source distributions (sdists) -- the build file provides the build backends (hatchling, maturin, etc.) needed to compile them.
+
+If a package has no wheel for your target architecture on PyPI (common on ppc64le/s390x), you have two options:
+
+1. **Use a custom index** like AIPCC that publishes prebuilt wheels for all architectures (see [Using AIPCC wheels](#using-aipcc-wheels)). This is the preferred approach -- hermeto handles arch selection at download time, so one requirements file works for all architectures.
+2. **Build from source** by adding a direct reference (e.g., `torch @ git+https://github.com/pytorch/pytorch@<commit>`) and ensuring `requirements_build_files` lists the needed build backends. You'll also need the native toolchain (compilers, -devel libraries) prefetched as RPMs. This works but is slow for heavy packages like torch.
 
 ### cargo (Rust)
 
@@ -398,7 +403,7 @@ uv run --python 3.9 --with pybuild-deps pybuild-deps compile \
   requirements.txt -o requirements-build.txt
 ```
 
-Match the `--python` version to your target image. This file is needed if any of your dependencies are installed from source distributions (sdists). If you are building for ppc64le or s390x, many packages do not publish prebuilt wheels on PyPI for those architectures, so a requirements-build file is likely needed.
+Match the `--python` version to your target image. This file is needed if any of your dependencies are installed from source distributions (sdists). If a package has no wheel for your target architecture, you'll need this file along with the native toolchain RPMs to build from source -- or use a custom index like AIPCC that has prebuilt wheels (see [Using AIPCC wheels](#using-aipcc-wheels)).
 
 ### Using AIPCC wheels
 
