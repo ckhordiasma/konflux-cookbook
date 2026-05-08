@@ -52,15 +52,15 @@ A typical multi-manager config:
 
 [Hermeto pip docs](https://hermetoproject.github.io/hermeto/latest/pip/)
 
-Hermeto requires a fully resolved `requirements.txt` with all transitive dependencies pinned to exact versions (e.g., `package==1.2.3`). Hashes are strongly recommended but optional for PyPI packages. For dependencies fetched via HTTPS URLs, exactly one `--hash` is required.
+Hermeto requires a fully resolved `requirements.txt` with all transitive dependencies pinned to exact versions (e.g., `package==1.2.3`). Hashes are strongly recommended but optional for PyPI packages. For dependencies fetched via HTTPS URLs, exactly one `--hash` is required. See [Python Requirements](#python-requirements) for how to generate these files.
 
 **Config fields:**
 
 | Field | Default | Description |
 |-------|---------|-------------|
 | `path` | `"."` | Directory containing requirements files, relative to `--source` |
-| `requirements_files` | `["requirements.txt"]` | List of pinned requirements files |
-| `requirements_build_files` | `["requirements-build.txt"]` or `[]` | Build backend dependencies for sdists. Defaults to `["requirements-build.txt"]` if the file exists, `[]` otherwise |
+| `requirements_files` | `["requirements.txt"]` | List of pinned requirements files (see [Python Requirements](#python-requirements)) |
+| `requirements_build_files` | `["requirements-build.txt"]` or `[]` | Build backend dependencies for sdists (see [Python Requirements](#python-requirements)). Defaults to `["requirements-build.txt"]` if the file exists, `[]` otherwise |
 | `binary` | *(omitted = sdists only)* | Binary wheel filter (see below) |
 
 **Example — minimal:**
@@ -90,40 +90,6 @@ By default, hermeto fetches only source distributions (sdists). Add a `binary` o
 The key fields are `packages` (comma-separated names, or `:all:` to try wheels for everything) and `arch` (comma-separated architectures, default `"x86_64"`). When `packages` is `:all:` (the default), hermeto prefers wheels but falls back to sdists. When you name specific packages, hermeto *fails* if no matching wheel exists. See the [hermeto pip docs](https://hermetoproject.github.io/hermeto/latest/pip/) for additional filter fields (`os`, `py_version`, `py_impl`, `abi`, `platform`).
 
 Even with binary wheels enabled, keep `requirements_build_files` -- not all packages publish wheels for every architecture (e.g., ppc64le, s390x), so hermeto will fall back to building from source and needs the build dependencies.
-
-#### Preparing pip requirements files
-
-If your project has a `requirements.in` (or `pyproject.toml`), use `uv pip compile` to produce a pinned `requirements.txt`. Use `--python-version` to match the Python version in your base image -- this ensures the resolver picks the right dependency versions:
-
-```bash
-uv pip compile requirements.in \
-  --python-platform linux \
-  --python-version 3.9 \
-  --index-strategy first-index \
-  -o requirements.txt
-```
-
-If you use a custom package index (like AIPCC), add `--emit-index-annotation` so the compiled file records which index each package came from. You can also use `--index-url` in the requirements file or pass `--index` to uv to specify the index.
-
-For source distributions, generate a build-dependencies file that lists build backends (hatchling, maturin, pdm-backend, etc.):
-
-```bash
-uv run --python 3.9 --with pybuild-deps pybuild-deps compile \
-  requirements.txt -o requirements-build.txt
-```
-
-Match the `--python` version to your target image.
-
-#### Using AIPCC wheels
-
-```
-uv pip compile pyproject.toml --python-platform linux  --index https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9-test/simple/ --index-strategy first-index --emit-index-annotation
-```
-
-If you want to include extras, add them as command flags:
-```
-uv pip compile pyproject.toml --python-platform linux --extra sdd --extra jailbreak --extra openai --extra nvidia --extra tracing --extra models --extra multilingual --extra server  --index https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9-test/simple/ --index-strategy first-index --emit-index-annotation
-```
 
 ### cargo (Rust)
 
@@ -391,6 +357,46 @@ Key points:
 - **Source the env file in every `RUN` that installs dependencies.** Each `RUN` is a separate shell, so `. /cachi2/cachi2.env` must appear in each one that calls pip, cargo, npm, etc.
 - **Do not combine sourcing with `&&` after a `COPY`.** The env file is mounted by the build system, not copied from your repo.
 - For **Cargo + pip** projects (e.g., Python packages with Rust extensions), the env file configures both pip and cargo at once.
+
+## Python Requirements
+
+Hermeto expects fully pinned `requirements.txt` files listing every transitive dependency. If your project only has a `requirements.in` (or `pyproject.toml`), you need to compile it into a pinned lockfile first.
+
+### Compiling requirements.txt
+
+Use `uv pip compile` to resolve and pin all transitive dependencies. Use `--python-version` to match the Python version in your base image -- this ensures the resolver picks the right dependency versions:
+
+```bash
+uv pip compile requirements.in \
+  --python-platform linux \
+  --python-version 3.9 \
+  --index-strategy first-index \
+  -o requirements.txt
+```
+
+If you use a custom package index (like AIPCC), add `--emit-index-annotation` so the compiled file records which index each package came from. You can also use `--index-url` in the requirements file or pass `--index` to uv to specify the index.
+
+### Generating requirements-build.txt
+
+Source distributions (sdists) need build backends (hatchling, maturin, pdm-backend, etc.) to compile. Use [pybuild-deps](https://pypi.org/project/pybuild-deps/) to discover these automatically:
+
+```bash
+uv run --python 3.9 --with pybuild-deps pybuild-deps compile \
+  requirements.txt -o requirements-build.txt
+```
+
+Match the `--python` version to your target image. Even if you enable binary wheels, keep `requirements-build.txt` -- not all packages publish wheels for every architecture (e.g., ppc64le, s390x), so hermeto may fall back to building from source.
+
+### Using AIPCC wheels
+
+```
+uv pip compile pyproject.toml --python-platform linux  --index https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9-test/simple/ --index-strategy first-index --emit-index-annotation
+```
+
+If you want to include extras, add them as command flags:
+```
+uv pip compile pyproject.toml --python-platform linux --extra sdd --extra jailbreak --extra openai --extra nvidia --extra tracing --extra models --extra multilingual --extra server  --index https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9-test/simple/ --index-strategy first-index --emit-index-annotation
+```
 
 ## RPM Dependencies
 
