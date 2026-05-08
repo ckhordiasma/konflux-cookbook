@@ -15,47 +15,263 @@ alias hermeto='podman run --rm -ti -v "$PWD:$PWD:z" -w "$PWD" \
 
 This mounts your project directory into the container so Hermeto can read lockfiles and write output.
 
+## Configuring `.hermeto.json`
+
+The hermeto config file defines which package managers to prefetch and how. It is a JSON array of package manager objects, each with a `type` field and manager-specific options. You can pass this config inline on the command line or save it to a file (conventionally `.hermeto.json`):
+
+```bash
+hermeto fetch-deps \
+  --source . \
+  --output .hermeto \
+  .hermeto.json
+```
+
+A typical multi-manager config:
+
+```json
+[
+  {
+    "type": "pip",
+    "path": ".",
+    "requirements_files": ["requirements.txt"],
+    "requirements_build_files": ["requirements-build.txt"],
+    "binary": {
+      "arch": "x86_64,aarch64,ppc64le,s390x"
+    }
+  },
+  {
+    "type": "rpm",
+    "path": "."
+  }
+]
+```
+
+### pip (Python)
+
+[Hermeto pip docs](https://hermetoproject.github.io/hermeto/latest/pip/)
+
+Hermeto requires a fully resolved `requirements.txt` with all transitive dependencies pinned to exact versions (e.g., `package==1.2.3`). Hashes are strongly recommended but optional for PyPI packages. For dependencies fetched via HTTPS URLs, exactly one `--hash` is required.
+
+**Config fields:**
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `path` | `"."` | Directory containing requirements files, relative to `--source` |
+| `requirements_files` | `["requirements.txt"]` | List of pinned requirements files |
+| `requirements_build_files` | `["requirements-build.txt"]` or `[]` | Build backend dependencies for sdists. Defaults to `["requirements-build.txt"]` if the file exists, `[]` otherwise |
+| `binary` | *(omitted = sdists only)* | Binary wheel filter (see below) |
+
+**Example — minimal:**
+
+```json
+{"type": "pip", "path": ".", "requirements_files": ["requirements.txt"]}
+```
+
+**Example — with binary wheels and build deps:**
+
+```json
+{
+  "type": "pip",
+  "path": ".",
+  "requirements_files": ["requirements.txt"],
+  "requirements_build_files": ["requirements-build.txt"],
+  "binary": {
+    "arch": "x86_64,aarch64,ppc64le,s390x"
+  }
+}
+```
+
+#### Binary wheel filtering
+
+By default, hermeto fetches only source distributions (sdists). Add a `binary` object to download prebuilt wheels instead. This avoids needing Rust/C toolchains at build time for packages like `pydantic-core` or `cryptography`.
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `packages` | `:all:` | Comma-separated package names, or `:all:` to try wheels for everything |
+| `arch` | `"x86_64"` | Comma-separated architectures |
+| `os` | `"linux"` | Comma-separated OS values |
+| `py_version` | *(none)* | Single integer, e.g. `312` for Python 3.12 |
+| `py_impl` | `"cp"` | Python implementation (e.g. `cp` for CPython) |
+| `abi` | `:all:` | ABI tag filter |
+| `platform` | *(none)* | Regex for platform tags |
+
+When `packages` is `:all:` (the default), hermeto prefers wheels but falls back to sdists. When you name specific packages, hermeto *fails* if no matching wheel exists.
+
+Even with binary wheels enabled, keep `requirements_build_files` -- not all packages publish wheels for every architecture (e.g., ppc64le, s390x), so hermeto will fall back to building from source and needs the build dependencies.
+
+#### Preparing pip requirements files
+
+If your project has a `requirements.in` (or `pyproject.toml`), use `uv pip compile` to produce a pinned `requirements.txt`. Use `--python-version` to match the Python version in your base image -- this ensures the resolver picks the right dependency versions:
+
+```bash
+uv pip compile requirements.in \
+  --python-platform linux \
+  --python-version 3.9 \
+  --index-strategy first-index \
+  -o requirements.txt
+```
+
+If you use a custom package index (like AIPCC), add `--emit-index-annotation` so the compiled file records which index each package came from. You can also use `--index-url` in the requirements file or pass `--index` to uv to specify the index.
+
+For source distributions, generate a build-dependencies file that lists build backends (hatchling, maturin, pdm-backend, etc.):
+
+```bash
+uv run --python 3.9 --with pybuild-deps pybuild-deps compile \
+  requirements.txt -o requirements-build.txt
+```
+
+Match the `--python` version to your target image.
+
+#### Using AIPCC wheels
+
+```
+uv pip compile pyproject.toml --python-platform linux  --index https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9-test/simple/ --index-strategy first-index --emit-index-annotation
+```
+
+If you want to include extras, add them as command flags:
+```
+uv pip compile pyproject.toml --python-platform linux --extra sdd --extra jailbreak --extra openai --extra nvidia --extra tracing --extra models --extra multilingual --extra server  --index https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9-test/simple/ --index-strategy first-index --emit-index-annotation
+```
+
+### cargo (Rust)
+
+[Hermeto cargo docs](https://hermetoproject.github.io/hermeto/latest/cargo/)
+
+Requires `Cargo.toml` and `Cargo.lock` to be present and in sync. The Cargo binary must be installed locally (or in the hermeto container).
+
+**Config fields:**
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `path` | `"."` | Directory containing `Cargo.toml`, relative to `--source` |
+
+**Example:**
+
+```json
+{"type": "cargo", "path": "."}
+```
+
+After fetching, run `hermeto inject-files` to generate `.cargo/config.toml`, which redirects Cargo to the local vendor directory.
+
+### gomod (Go)
+
+[Hermeto gomod docs](https://hermetoproject.github.io/hermeto/latest/gomod/)
+
+Requires `go.mod` and `go.sum`.
+
+**Config fields:**
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `path` | `"."` | Directory containing `go.mod`, relative to `--source` |
+
+**Example:**
+
+```json
+{"type": "gomod", "path": "."}
+```
+
+### npm (JavaScript)
+
+[Hermeto npm docs](https://hermetoproject.github.io/hermeto/latest/npm/)
+
+Requires `package.json` and `package-lock.json`.
+
+**Config fields:**
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `path` | `"."` | Directory containing `package.json`, relative to `--source` |
+
+**Example:**
+
+```json
+{"type": "npm", "path": "."}
+```
+
+### yarn (JavaScript)
+
+[Hermeto yarn docs](https://hermetoproject.github.io/hermeto/latest/yarn/)
+
+Supports Yarn versions 1, 3, and 4.
+
+**Config fields:**
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `path` | `"."` | Directory containing `package.json`, relative to `--source` |
+| `workspaces` | *(none)* | List of workspace names for monorepo projects |
+
+**Example:**
+
+```json
+{"type": "yarn", "path": "."}
+```
+
+**Example — with workspaces:**
+
+```json
+{"type": "yarn", "path": ".", "workspaces": ["packages/ui", "packages/api"]}
+```
+
+### bundler (Ruby)
+
+[Hermeto bundler docs](https://hermetoproject.github.io/hermeto/latest/bundler/)
+
+Requires `Gemfile` and `Gemfile.lock`.
+
+**Config fields:**
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `path` | `"."` | Directory containing `Gemfile`, relative to `--source` |
+
+**Example:**
+
+```json
+{"type": "bundler", "path": "."}
+```
+
+### rpm
+
+[Hermeto rpm docs](https://hermetoproject.github.io/hermeto/latest/rpm/)
+
+Prefetches system RPM packages. Requires an `rpms.lock.yaml` lockfile (see [RPM Dependencies](#rpm-dependencies) below for how to generate it).
+
+**Config fields:**
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `path` | `"."` | Directory containing `rpms.lock.yaml`, relative to `--source` |
+
+**Example:**
+
+```json
+{"type": "rpm", "path": "."}
+```
+
 ## Basic Usage
 
 The core workflow has three steps: fetch dependencies, generate the environment file, and inject any config files package managers need.
 
 ### 1. Fetch dependencies
 
-Assuming you are in the root level of your project directory
+Assuming you are in the root level of your project directory:
+
+```bash
+hermeto fetch-deps \
+  --source . \
+  --output .hermeto \
+  .hermeto.json
+```
+
+You can also pass the package manager config inline as a string or simple keyword:
 
 ```bash
 hermeto fetch-deps \
   --source . \
   --output .hermeto \
   pip
-```
-
-The package manager argument can be a simple string (`pip`, `cargo`, `gomod`, `npm`, `yarn`, `bundler`, `rpm`) or a JSON object for more control:
-
-```bash
-hermeto fetch-deps \
-  --source . \
-  --output .hermeto \
-  '{"type": "pip", "path": ".", "requirements_files": ["requirements.txt"]}'
-```
-
-To fetch multiple package managers at once, pass a JSON array:
-
-```bash
-hermeto fetch-deps \
-  --source . \
-  --output .hermeto \
-  '[{"type": "pip", "path": "."}, {"type": "cargo", "path": "."}]'
-```
-
-You can also put your config JSON in a file and reference it that way:
-
-```bash
-echo '[{"type": "pip", "path": "."}, {"type": "cargo", "path": "."}]' > .hermeto.json
-hermeto fetch-deps \
-  --source . \
-  --output .hermeto \
-  .hermeto.json 
 ```
 
 ### 2. Generate the environment file
@@ -148,125 +364,6 @@ ssh -t user@remote-host 'cd /tmp/myproject && make -f Makefile.hermeto build'
 ```
 
 The `build` target only requires `podman` -- it doesn't need `uv` or other tools that are only used during the resolution stages. This makes it easy to test on minimal hosts.
-
-## Package Manager Examples
-
-### pip (Python)
-
-Hermeto requires a fully resolved `requirements.txt` with all transitive dependencies pinned to exact versions (e.g., `package==1.2.3`). Hashes are strongly recommended but optional for PyPI packages. For dependencies fetched via HTTPS URLs, exactly one `--hash` is required.
-
-#### Compiling requirements with uv
-
-If your project has a `requirements.in` (or `pyproject.toml`), use `uv pip compile` to produce a pinned `requirements.txt`. Use `--python-version` to match the Python version in your base image -- this ensures the resolver picks the right dependency versions:
-
-```bash
-uv pip compile requirements.in \
-  --python-platform linux \
-  --python-version 3.9 \
-  --index-strategy first-index \
-  -o requirements.txt
-```
-
-If you use a custom package index (like AIPCC), add `--emit-index-annotation` so the compiled file records which index each package came from. You can also use `--index-url` in the requirements file or pass `--index` to uv to specify the index.
-
-#### Build dependencies for source distributions
-
-If your project has packages that build from source (sdists), you also need a build-dependencies file that lists their build backends (hatchling, maturin, pdm-backend, etc.):
-
-```bash
-uv run --python 3.9 --with pybuild-deps pybuild-deps compile \
-  requirements.txt -o requirements-build.txt
-```
-
-Match the `--python` version to your target image. If you enable binary wheels (see below), you can often skip this step since wheels don't need build backends.
-
-#### Using binary wheels
-
-By default, hermeto fetches only source distributions (sdists). To download prebuilt binary wheels instead, add a `binary` section to your hermeto config. This avoids needing Rust/C toolchains to compile packages like `pydantic-core` or `cryptography`.
-
-To prefer wheels for all packages (falling back to sdists when no wheel is available):
-
-```json
-{
-  "type": "pip",
-  "path": ".",
-  "requirements_files": ["requirements.txt"],
-  "requirements_build_files": ["requirements-build.txt"],
-  "binary": {
-    "arch": "x86_64,aarch64,ppc64le,s390x"
-  }
-}
-```
-
-List all architectures you build for, comma-separated. The `packages` field defaults to `:all:`, which means "try wheels for everything, fall back to sdists." If you name specific packages instead (e.g., `"packages": "pydantic-core,cryptography"`), hermeto will *fail* if no matching wheel exists for those packages.
-
-Other available filter fields: `os` (default `"linux"`), `py_version` (e.g., `312` for Python 3.12), `py_impl` (default `"cp"`), `abi`, `platform` (regex).
-
-Even with binary wheels enabled, keep `requirements_build_files` -- not all packages publish wheels for every architecture (e.g., ppc64le, s390x), so hermeto will fall back to building from source and needs the build dependencies.
-
-#### Fetching pip dependencies
-
-Then fetch:
-
-```bash
-hermeto fetch-deps \
-  --source . \
-  --output ./hermeto-output \
-  '{
-    "type": "pip",
-    "path": ".",
-    "requirements_files": ["requirements.txt"],
-    "requirements_build_files": ["requirements-build.txt"]
-  }'
-```
-
-**Wheel filtering** -- to require binary wheels for specific packages (fails if no matching wheel exists):
-
-```bash
-hermeto fetch-deps \
-  --source . \
-  --output ./hermeto-output \
-  '{
-    "type": "pip",
-    "path": ".",
-    "requirements_files": ["requirements.txt"],
-    "binary": {
-      "packages": "tensorflow",
-      "os": "linux",
-      "arch": "x86_64",
-      "py_version": 312
-    }
-  }'
-```
-#### Using AIPCC wheels
-
-
-```
-uv pip compile pyproject.toml --python-platform linux  --index https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9-test/simple/ --index-strategy first-index --emit-index-annotation
-```
-
-If you want to include extras, add them as command flags:
-```
-uv pip compile pyproject.toml --python-platform linux --extra sdd --extra jailbreak --extra openai --extra nvidia --extra tracing --extra models --extra multilingual --extra server  --index https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9-test/simple/ --index-strategy first-index --emit-index-annotation
-```
-### cargo (Rust)
-
-Ensure both `Cargo.toml` and `Cargo.lock` are present and in sync:
-
-```bash
-hermeto fetch-deps \
-  --source . \
-  --output ./hermeto-output \
-  cargo
-```
-
-After fetching, run `inject-files` to generate `.cargo/config.toml` which redirects Cargo to the local vendor directory:
-
-```bash
-hermeto inject-files ./hermeto-output --for-output-dir /cachi2/output
-```
-
-Copy `.cargo/config.toml` into your container image alongside `Cargo.toml` and `Cargo.lock`.
 
 ## Modifying Your Dockerfile.konflux
 
