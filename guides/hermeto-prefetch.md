@@ -422,7 +422,7 @@ Some packages (like torch) have no wheels or sdists on PyPI for ppc64le/s390x bu
 
 **1. Create a separate requirements file for the source package:**
 
-`requirements-torch-source.in`:
+`requirements-torch-source.txt`:
 ```
 torch @ https://github.com/pytorch/pytorch/releases/download/v2.11.0/torch-2.11.0.tar.gz
 ```
@@ -433,7 +433,7 @@ Run `pybuild-deps` against this file to discover the build backends needed to co
 
 ```bash
 uv run --python 3.12 --with pybuild-deps pybuild-deps compile \
-  requirements-torch-source.in -o requirements-build-torch.txt
+  requirements-torch-source.txt -o requirements-build-torch.txt
 ```
 
 This produces a file with cmake, ninja, numpy, cython, and other build backends that torch needs.
