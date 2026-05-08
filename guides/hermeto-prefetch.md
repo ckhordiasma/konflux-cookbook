@@ -52,7 +52,7 @@ A typical multi-manager config:
 
 [Hermeto pip docs](https://hermetoproject.github.io/hermeto/latest/pip/)
 
-Hermeto requires a fully resolved `requirements.txt` with all transitive dependencies pinned to exact versions (e.g., `package==1.2.3`). Hashes are strongly recommended but optional for PyPI packages. For dependencies fetched via HTTPS URLs, exactly one `--hash` is required. See [Python Requirements](#python-requirements) for how to generate these files.
+Hermeto requires a fully resolved `requirements.txt` with all transitive dependencies pinned to exact versions (e.g., `package==1.2.3`). Hashes are optional but recommended for PyPI packages, and mandatory for HTTPS URL dependencies. See [Python Requirements](#python-requirements) for how to generate these files.
 
 **Config fields:**
 
@@ -89,7 +89,7 @@ By default, hermeto fetches only source distributions (sdists). Add a `binary` o
 
 The key fields are `packages` (comma-separated names, or `:all:` to try wheels for everything) and `arch` (comma-separated architectures, default `"x86_64"`). When `packages` is `:all:` (the default), hermeto prefers wheels but falls back to sdists. When you name specific packages, hermeto *fails* if no matching wheel exists. See the [hermeto pip docs](https://hermetoproject.github.io/hermeto/latest/pip/) for additional filter fields (`os`, `py_version`, `py_impl`, `abi`, `platform`).
 
-Even with binary wheels enabled, keep `requirements_build_files` -- not all packages publish wheels for every architecture (e.g., ppc64le, s390x), so hermeto will fall back to building from source and needs the build dependencies.
+`requirements_build_files` is needed if any of your dependencies are installed from source distributions (sdists). If you are building for ppc64le or s390x, many packages do not publish prebuilt wheels on PyPI for those architectures, so a requirements-build file is likely needed.
 
 ### cargo (Rust)
 
@@ -385,7 +385,7 @@ uv run --python 3.9 --with pybuild-deps pybuild-deps compile \
   requirements.txt -o requirements-build.txt
 ```
 
-Match the `--python` version to your target image. Even if you enable binary wheels, keep `requirements-build.txt` -- not all packages publish wheels for every architecture (e.g., ppc64le, s390x), so hermeto may fall back to building from source.
+Match the `--python` version to your target image. This file is needed if any of your dependencies are installed from source distributions (sdists). If you are building for ppc64le or s390x, many packages do not publish prebuilt wheels on PyPI for those architectures, so a requirements-build file is likely needed.
 
 ### Using AIPCC wheels
 
