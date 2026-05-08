@@ -87,17 +87,7 @@ Hermeto requires a fully resolved `requirements.txt` with all transitive depende
 
 By default, hermeto fetches only source distributions (sdists). Add a `binary` object to download prebuilt wheels instead. This avoids needing Rust/C toolchains at build time for packages like `pydantic-core` or `cryptography`.
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `packages` | `:all:` | Comma-separated package names, or `:all:` to try wheels for everything |
-| `arch` | `"x86_64"` | Comma-separated architectures |
-| `os` | `"linux"` | Comma-separated OS values |
-| `py_version` | *(none)* | Single integer, e.g. `312` for Python 3.12 |
-| `py_impl` | `"cp"` | Python implementation (e.g. `cp` for CPython) |
-| `abi` | `:all:` | ABI tag filter |
-| `platform` | *(none)* | Regex for platform tags |
-
-When `packages` is `:all:` (the default), hermeto prefers wheels but falls back to sdists. When you name specific packages, hermeto *fails* if no matching wheel exists.
+The key fields are `packages` (comma-separated names, or `:all:` to try wheels for everything) and `arch` (comma-separated architectures, default `"x86_64"`). When `packages` is `:all:` (the default), hermeto prefers wheels but falls back to sdists. When you name specific packages, hermeto *fails* if no matching wheel exists. See the [hermeto pip docs](https://hermetoproject.github.io/hermeto/latest/pip/) for additional filter fields (`os`, `py_version`, `py_impl`, `abi`, `platform`).
 
 Even with binary wheels enabled, keep `requirements_build_files` -- not all packages publish wheels for every architecture (e.g., ppc64le, s390x), so hermeto will fall back to building from source and needs the build dependencies.
 
