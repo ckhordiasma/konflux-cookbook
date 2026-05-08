@@ -107,7 +107,7 @@ The key fields are `packages` (comma-separated names, or `:all:` to try wheels f
 If a package has no wheel for your target architecture on PyPI (common on ppc64le/s390x), you have two options:
 
 1. **Use a custom index** like AIPCC that publishes prebuilt wheels for all architectures (see [Using AIPCC wheels](#using-aipcc-wheels)). This is the preferred approach -- hermeto handles arch selection at download time, so one requirements file works for all architectures.
-2. **Build from source** by adding a direct reference (e.g., `torch @ git+https://github.com/pytorch/pytorch@<commit>`) and ensuring `requirements_build_files` lists the needed build backends. You'll also need the native toolchain (compilers, -devel libraries) prefetched as RPMs. This works but is slow for heavy packages like torch.
+2. **Build from source** by prefetching the source tarball through `requirements_build_files` alongside the build backends needed to compile it. Pip will use PyPI wheels where available and fall back to the source tarball on architectures that lack wheels. See [Building from source for missing architectures](#building-from-source-for-missing-architectures) for a worked example.
 
 ### cargo (Rust)
 
@@ -415,6 +415,61 @@ If you want to include extras, add them as command flags:
 ```
 uv pip compile pyproject.toml --python-platform linux --extra sdd --extra jailbreak --extra openai --extra nvidia --extra tracing --extra models --extra multilingual --extra server  --index https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9-test/simple/ --index-strategy first-index --emit-index-annotation
 ```
+
+### Building from source for missing architectures
+
+Some packages (like torch) have no wheels or sdists on PyPI for ppc64le/s390x but do publish source tarballs on their GitHub releases. You can prefetch these source tarballs through `requirements_build_files` so that pip can build from source on architectures that lack wheels, while still using PyPI wheels on x86_64/aarch64.
+
+**1. Create a separate requirements file for the source package:**
+
+`requirements-torch-source.in`:
+```
+torch @ https://github.com/pytorch/pytorch/releases/download/v2.11.0/torch-2.11.0.tar.gz
+```
+
+**2. Generate the build dependencies:**
+
+Run `pybuild-deps` against this file to discover the build backends needed to compile it:
+
+```bash
+uv run --python 3.12 --with pybuild-deps pybuild-deps compile \
+  requirements-torch-source.in -o requirements-build-torch.txt
+```
+
+This produces a file with cmake, ninja, numpy, cython, and other build backends that torch needs.
+
+**3. Keep torch as a version pin in your main requirements:**
+
+`requirements.in`:
+```
+torch==2.11.0
+```
+
+Compile as normal with `uv pip compile`. The output `requirements.txt` will have `torch==2.11.0` as a version pin, not a URL reference.
+
+**4. Configure hermeto to fetch both wheels and the source tarball:**
+
+```json
+{
+  "type": "pip",
+  "path": ".",
+  "requirements_files": ["requirements.txt"],
+  "requirements_build_files": [
+    "requirements-build.txt",
+    "requirements-build-torch.txt",
+    "requirements-torch-source.txt"
+  ],
+  "binary": {
+    "arch": "x86_64,aarch64,ppc64le,s390x"
+  }
+}
+```
+
+Everything lands in the same output directory. At install time:
+- On **x86_64/aarch64**: pip finds the PyPI wheel in the cache and uses it directly
+- On **ppc64le/s390x**: pip finds no wheel, discovers the source tarball in the cache, and builds from source using the prefetched build backends
+
+This approach uses a single requirements.txt and a single hermeto config for all architectures. The source build on ppc64le/s390x will also need the native toolchain (compilers, -devel libraries) prefetched as RPMs — see [RPM Dependencies](#rpm-dependencies).
 
 ## RPM Dependencies
 
