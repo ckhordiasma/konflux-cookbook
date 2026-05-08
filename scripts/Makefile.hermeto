@@ -1,0 +1,172 @@
+# Makefile.hermeto — Hermetic build workflow using Hermeto
+#
+# Copy this file into your project and configure the variables below,
+# then run:
+#
+#   make -f Makefile.hermeto build
+#
+# You can also run individual stages:
+#
+#   make -f Makefile.hermeto pip-compile   # resolve .in -> .txt
+#   make -f Makefile.hermeto build-deps    # find build backends
+#   make -f Makefile.hermeto rpm-lock      # generate rpms.lock.yaml
+#   make -f Makefile.hermeto hermeto       # prefetch everything
+#   make -f Makefile.hermeto dockerfile    # generate hermetic Dockerfile
+#   make -f Makefile.hermeto build         # full offline podman build
+#   make -f Makefile.hermeto clean         # remove generated artifacts
+#
+# Override variables on the command line:
+#
+#   make -f Makefile.hermeto PYTHON_VERSION=3.12 DOCKERFILE=Dockerfile.konflux build
+
+# ---------------------------------------------------------------------------
+# Configuration — edit these for your project
+# ---------------------------------------------------------------------------
+
+# Target Python version (must match the base image)
+PYTHON_VERSION ?= 3.9
+
+# Space-separated list of requirements .in files to compile
+REQUIREMENTS_IN ?= requirements.in
+
+# Hermeto config file
+HERMETO_CONFIG ?= .hermeto.json
+
+# Source Dockerfile to transform for hermetic builds
+DOCKERFILE ?= Dockerfile.konflux
+
+# Docker build context directory
+BUILD_CONTEXT ?= .
+
+# Hermeto output directory
+HERMETO_OUTPUT ?= .hermeto
+
+# ---------------------------------------------------------------------------
+# Derived values — normally you don't need to change these
+# ---------------------------------------------------------------------------
+
+# Compiled .txt files (one per .in file)
+REQUIREMENTS_TXT := $(REQUIREMENTS_IN:.in=.txt)
+
+# Build-dependencies output
+REQUIREMENTS_BUILD := requirements-build.txt
+
+# Hermetic Dockerfile (generated)
+HERMETO_DOCKERFILE := $(dir $(DOCKERFILE)).hermeto.$(notdir $(DOCKERFILE))
+
+# CPU architecture, mapping macOS arm64 to Linux aarch64
+ARCH := $(shell uname -m)
+ifeq ($(ARCH),arm64)
+  ARCH := aarch64
+endif
+
+# uv pip compile flags targeting a Linux build environment
+UV_COMPILE := uv pip compile --python-platform linux --python-version $(PYTHON_VERSION) \
+  --index-strategy first-index --emit-index-annotation
+
+# Run hermeto via its container image
+HERMETO := podman run --rm -ti -v "$(CURDIR):$(CURDIR):z" -w "$(CURDIR)" \
+  ghcr.io/hermetoproject/hermeto:latest
+
+# Use gsed on macOS, sed on Linux
+ifeq ($(shell uname -s),Darwin)
+  SED := gsed
+else
+  SED := sed
+endif
+
+# Sentinel file that hermeto creates on successful fetch
+HERMETO_SENTINEL := $(HERMETO_OUTPUT)/.build-config.json
+
+.PHONY: all check-podman check-uv check-sed check-rpm-lockfile \
+  pip-compile build-deps rpm-lock hermeto dockerfile build clean
+
+# Default target: run everything end-to-end
+all: build
+
+# ---------------------------------------------------------------------------
+# check-*: per-tool dependency checks, only pulled in by phony targets.
+# ---------------------------------------------------------------------------
+check-podman:
+	@command -v podman >/dev/null || { echo "ERROR: podman not found"; exit 1; }
+
+check-uv:
+	@command -v uv >/dev/null || { echo "ERROR: uv not found — install with: curl -LsSf https://astral.sh/uv/install.sh | sh"; exit 1; }
+
+check-sed:
+	@command -v $(SED) >/dev/null || { echo "ERROR: $(SED) not found"; exit 1; }
+
+check-rpm-lockfile: check-podman
+	@podman image exists localhost/rpm-lockfile-prototype:latest 2>/dev/null \
+	  || { echo "==> Building rpm-lockfile-prototype image ..."; \
+	       curl -sL https://raw.githubusercontent.com/konflux-ci/rpm-lockfile-prototype/refs/heads/main/Containerfile \
+	         | podman build -t localhost/rpm-lockfile-prototype -; }
+
+# ---------------------------------------------------------------------------
+# pip-compile: resolve .in files into fully-pinned requirements.txt files.
+# ---------------------------------------------------------------------------
+
+# Generate a pattern rule for each .in -> .txt pair
+%.txt: %.in
+	$(UV_COMPILE) -o $@ $<
+
+pip-compile: check-uv $(REQUIREMENTS_TXT)
+
+# ---------------------------------------------------------------------------
+# build-deps: find build backends (hatchling, maturin, etc.) needed to
+# compile source distributions.
+# ---------------------------------------------------------------------------
+$(REQUIREMENTS_BUILD): $(REQUIREMENTS_TXT)
+	uv run --python $(PYTHON_VERSION) --with pybuild-deps pybuild-deps compile $^ -o $@
+
+build-deps: check-uv $(REQUIREMENTS_BUILD)
+
+# ---------------------------------------------------------------------------
+# rpm-lock: resolve RPM packages into a lockfile.
+# ---------------------------------------------------------------------------
+rpms.lock.yaml: rpms.in.yaml
+	podman run --rm -v "$(CURDIR):/work:Z" localhost/rpm-lockfile-prototype:latest \
+	  --outfile=rpms.lock.yaml rpms.in.yaml
+
+rpm-lock: check-rpm-lockfile rpms.lock.yaml
+
+# ---------------------------------------------------------------------------
+# hermeto: prefetch all dependencies into $(HERMETO_OUTPUT)/.
+# ---------------------------------------------------------------------------
+$(HERMETO_SENTINEL): $(REQUIREMENTS_TXT) $(REQUIREMENTS_BUILD) rpms.lock.yaml $(HERMETO_CONFIG)
+	rm -rf $(HERMETO_OUTPUT) && mkdir $(HERMETO_OUTPUT)
+	$(HERMETO) fetch-deps --source . --output $(HERMETO_OUTPUT) $(HERMETO_CONFIG)
+	$(HERMETO) generate-env $(HERMETO_OUTPUT)/ -o .hermeto.env --for-output-dir /cachi2/output
+	$(HERMETO) inject-files ./$(HERMETO_OUTPUT) --for-output-dir /cachi2/output
+
+hermeto: check-podman $(HERMETO_SENTINEL)
+
+# ---------------------------------------------------------------------------
+# dockerfile: generate the hermetic Dockerfile by prepending
+# `. /cachi2/cachi2.env &&` to every RUN instruction.
+# ---------------------------------------------------------------------------
+$(HERMETO_DOCKERFILE): $(DOCKERFILE)
+	$(SED) -E \
+	  -e 'H;1h;$$!d;x' \
+	  -e 's@^\s*(run((\s|\\\n)+-\S+)*(\s|\\\n)+)@\1. /cachi2/cachi2.env \&\& \\\n    @igM' \
+	  $< > $@
+
+dockerfile: check-sed $(HERMETO_DOCKERFILE)
+
+# ---------------------------------------------------------------------------
+# build: run the podman build fully offline with prefetched deps mounted in.
+# ---------------------------------------------------------------------------
+build: $(HERMETO_SENTINEL) $(HERMETO_DOCKERFILE)
+	podman build \
+	  --no-cache \
+	  --network none \
+	  --volume "$(realpath ./$(HERMETO_OUTPUT))":/cachi2/output:Z \
+	  --volume "$(realpath ./.hermeto.env)":/cachi2/cachi2.env:Z \
+	  --volume "$(realpath ./$(HERMETO_OUTPUT))/deps/rpm/$(ARCH)/repos.d":/etc/yum.repos.d:Z \
+	  -f $(HERMETO_DOCKERFILE) $(BUILD_CONTEXT)
+
+# ---------------------------------------------------------------------------
+# clean: remove all generated artifacts
+# ---------------------------------------------------------------------------
+clean:
+	rm -rf $(HERMETO_OUTPUT) .hermeto.env $(HERMETO_DOCKERFILE)

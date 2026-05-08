@@ -6,13 +6,7 @@ Hermeto is a CLI tool that pre-fetches project dependencies so that container bu
 
 ## Installing Hermeto
 
-### pip
-
-```bash
-pip install hermeto
-```
-
-### Container (no local install needed)
+### Container 
 
 ```bash
 alias hermeto='podman run --rm -ti -v "$PWD:$PWD:z" -w "$PWD" \
@@ -27,10 +21,12 @@ The core workflow has three steps: fetch dependencies, generate the environment 
 
 ### 1. Fetch dependencies
 
+Assuming you are in the root level of your project directory
+
 ```bash
 hermeto fetch-deps \
-  --source ./my-repo \
-  --output ./hermeto-output \
+  --source . \
+  --output .hermeto \
   pip
 ```
 
@@ -38,8 +34,8 @@ The package manager argument can be a simple string (`pip`, `cargo`, `gomod`, `n
 
 ```bash
 hermeto fetch-deps \
-  --source ./my-repo \
-  --output ./hermeto-output \
+  --source . \
+  --output .hermeto \
   '{"type": "pip", "path": ".", "requirements_files": ["requirements.txt"]}'
 ```
 
@@ -47,15 +43,25 @@ To fetch multiple package managers at once, pass a JSON array:
 
 ```bash
 hermeto fetch-deps \
-  --source ./my-repo \
-  --output ./hermeto-output \
+  --source . \
+  --output .hermeto \
   '[{"type": "pip", "path": "."}, {"type": "cargo", "path": "."}]'
+```
+
+You can also put your config JSON in a file and reference it that way:
+
+```bash
+echo '[{"type": "pip", "path": "."}, {"type": "cargo", "path": "."}]' > .hermeto.json
+hermeto fetch-deps \
+  --source . \
+  --output .hermeto \
+  .hermeto.json 
 ```
 
 ### 2. Generate the environment file
 
 ```bash
-hermeto generate-env ./hermeto-output -o ./hermeto.env \
+hermeto generate-env .hermeto/ -o .hermeto.env \
   --for-output-dir /cachi2/output
 ```
 
@@ -64,7 +70,7 @@ The `--for-output-dir` flag sets the absolute path where the output will be moun
 ### 3. Inject configuration files
 
 ```bash
-hermeto inject-files ./hermeto-output --for-output-dir /cachi2/output
+hermeto inject-files ./.hermeto --for-output-dir /cachi2/output
 ```
 
 This modifies project files (e.g., creates `.cargo/config.toml` for Cargo) so that package managers point at the local cache. Run this before committing -- it may overwrite files in your working tree.
@@ -73,29 +79,126 @@ This modifies project files (e.g., creates `.cargo/config.toml` for Cargo) so th
 
 ```bash
 podman build . \
-  --volume "$(realpath ./hermeto-output)":/cachi2/output:Z \
-  --volume "$(realpath ./hermeto.env)":/cachi2/cachi2.env:Z \
+  --volume "$(realpath ./.hermeto)":/cachi2/output:Z \
+  --volume "$(realpath ./.hermeto.env)":/cachi2/cachi2.env:Z \
   --network none \
   -f Dockerfile.konflux
 ```
 
 The `--network none` flag proves that all dependencies are actually prefetched.
 
+## Makefile-Based Workflow
+
+For iterative development, a Makefile lets you run individual stages without re-running everything from scratch. The cookbook includes a parameterized Makefile at `scripts/Makefile.hermeto` that you can copy into your project and configure.
+
+### Setup
+
+Copy the Makefile and configure the variables at the top:
+
+```bash
+cp /path/to/konflux-cookbook/scripts/Makefile.hermeto .
+```
+
+Or override variables on the command line:
+
+```bash
+make -f Makefile.hermeto PYTHON_VERSION=3.12 DOCKERFILE=Dockerfile.konflux build
+```
+
+### Configuration Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PYTHON_VERSION` | `3.9` | Target Python version (must match base image) |
+| `REQUIREMENTS_IN` | `requirements.in` | Space-separated list of `.in` files to compile |
+| `HERMETO_CONFIG` | `.hermeto.json` | Path to hermeto JSON config |
+| `DOCKERFILE` | `Dockerfile.konflux` | Source Dockerfile to transform |
+| `BUILD_CONTEXT` | `.` | Docker build context directory |
+| `HERMETO_OUTPUT` | `.hermeto` | Output directory for prefetched deps |
+
+### Available Targets
+
+Run any stage independently -- Make tracks file timestamps and skips work that's already done:
+
+```bash
+make -f Makefile.hermeto pip-compile   # resolve .in -> .txt
+make -f Makefile.hermeto build-deps    # find build backends (pybuild-deps)
+make -f Makefile.hermeto rpm-lock      # generate rpms.lock.yaml
+make -f Makefile.hermeto hermeto       # prefetch everything into .hermeto/
+make -f Makefile.hermeto dockerfile    # generate hermetic Dockerfile
+make -f Makefile.hermeto build         # full offline podman build
+make -f Makefile.hermeto clean         # remove generated artifacts
+```
+
+The `build` target depends on all upstream stages, so `make build` runs everything end-to-end. If you've already run `pip-compile` and only changed `rpms.in.yaml`, running `make build` will skip pip compilation and only re-run what changed.
+
+### Testing on Remote Architectures
+
+To test hermetic builds on a different CPU architecture (e.g., x86_64 from an ARM Mac), sync to a remote host and run just the build stage:
+
+```bash
+# On your local machine: run pip-compile and hermeto (these don't need target arch)
+make -f Makefile.hermeto hermeto dockerfile
+
+# Sync to a remote host
+rsync -az --delete . user@remote-host:/tmp/myproject
+
+# On the remote host: only podman is needed, not uv
+ssh -t user@remote-host 'cd /tmp/myproject && make -f Makefile.hermeto build'
+```
+
+The `build` target only requires `podman` -- it doesn't need `uv` or other tools that are only used during the resolution stages. This makes it easy to test on minimal hosts.
+
 ## Package Manager Examples
 
 ### pip (Python)
 
-Hermeto requires a fully resolved `requirements.txt` with pinned versions. Generate one with hashes for security:
+Hermeto requires a fully resolved `requirements.txt` with pinned versions and index annotations.
+
+#### Compiling requirements with uv
+
+If your project has a `requirements.in` (or `pyproject.toml`), use `uv pip compile` to produce a pinned `requirements.txt`. Use `--python-version` to match the Python version in your base image -- this ensures the resolver picks the right dependency versions:
 
 ```bash
-pip-compile pyproject.toml --generate-hashes -o requirements.txt
+uv pip compile requirements.in \
+  --python-platform linux \
+  --python-version 3.9 \
+  --index-strategy first-index \
+  --emit-index-annotation \
+  -o requirements.txt
 ```
 
-If your project has packages that build from source (sdists), you also need a build-dependencies file:
+The `--emit-index-annotation` flag adds index comments that Hermeto needs to locate packages from custom indexes (like AIPCC).
+
+#### Build dependencies for source distributions
+
+If your project has packages that build from source (sdists), you also need a build-dependencies file that lists their build backends (hatchling, maturin, pdm-backend, etc.):
 
 ```bash
-pybuild-deps compile --generate-hashes -o requirements-build.txt requirements.txt
+uv run --python 3.9 --with pybuild-deps pybuild-deps compile \
+  requirements.txt -o requirements-build.txt
 ```
+
+Match the `--python` version to your target image. If you enable binary wheels (see below), you can often skip this step since wheels don't need build backends.
+
+#### Using binary wheels
+
+To download prebuilt binary wheels instead of source distributions, add a `binary` section to your hermeto config. This avoids needing Rust/C toolchains to compile packages like `pydantic-core` or `cryptography`:
+
+```json
+{
+  "type": "pip",
+  "path": ".",
+  "requirements_files": ["requirements.txt"],
+  "binary": {
+    "arch": "x86_64,aarch64,ppc64le,s390x"
+  }
+}
+```
+
+List all architectures you build for, comma-separated. When using binary wheels, you can usually omit `requirements_build_files` since the wheels ship precompiled.
+
+#### Fetching pip dependencies
 
 Then fetch:
 
@@ -129,7 +232,17 @@ hermeto fetch-deps \
     }
   }'
 ```
+#### Using AIPCC wheels
 
+
+```
+uv pip compile pyproject.toml --python-platform linux  --index https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9-test/simple/ --index-strategy first-index --emit-index-annotation
+```
+
+If you want to include extras, add them as command flags:
+```
+uv pip compile pyproject.toml --python-platform linux --extra sdd --extra jailbreak --extra openai --extra nvidia --extra tracing --extra models --extra multilingual --extra server  --index https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9-test/simple/ --index-strategy first-index --emit-index-annotation
+```
 ### cargo (Rust)
 
 Ensure both `Cargo.toml` and `Cargo.lock` are present and in sync:
@@ -214,6 +327,30 @@ context:
     stageName: base
 ```
 
+other ways of specifying context
+
+```
+context:
+  containerfile:
+    file: Dockerfiles/controller.Dockerfile.konflux
+    imagePattern: ubi9/ubi-minimal
+```
+
+The `contentOrigin` section can also be inlined:
+
+```
+contentOrigin:
+  repos:
+  - repoid: ubi-9-for-$basearch-baseos-rpms
+    baseurl: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/$basearch/baseos/os
+  - repoid: ubi-9-for-$basearch-baseos-source-rpms
+    baseurl: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/$basearch/baseos/source/SRPMS
+  - repoid: ubi-9-for-$basearch-appstream-rpms
+    baseurl: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/$basearch/appstream/os
+  - repoid: ubi-9-for-$basearch-appstream-source-rpms
+    baseurl: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/$basearch/appstream/source/SRPMS
+```
+
 The `context.containerfile` field tells the lockfile generator which Dockerfile stage needs these packages, so it can resolve the correct base image repositories.
 
 ### Generating rpms.lock.yaml
@@ -221,7 +358,10 @@ The `context.containerfile` field tells the lockfile generator which Dockerfile 
 Use [rpm-lockfile-prototype](https://github.com/konflux-ci/rpm-lockfile-prototype) to resolve and lock RPM versions:
 
 ```bash
-rpm-lockfile-prototype rpms.in.yaml
+curl https://raw.githubusercontent.com/konflux-ci/rpm-lockfile-prototype/refs/heads/main/Containerfile \
+   | podman build -t localhost/rpm-lockfile-prototype -
+
+podman run --rm -v "${PWD}:/work:Z" localhost/rpm-lockfile-prototype:latest --outfile=rpms.lock.yaml rpms.in.yaml
 ```
 
 This produces `rpms.lock.yaml` with exact URLs and checksums for every RPM (including transitive dependencies) across all declared architectures. The lockfile is typically large -- thousands of lines is normal. Commit both `rpms.in.yaml` and `rpms.lock.yaml`.
