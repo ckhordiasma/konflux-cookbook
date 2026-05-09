@@ -415,9 +415,11 @@ The full index URL prefix is `https://console.redhat.com/api/pypi/public-rhai/`.
 
 To request a new package or version, use the [AIPCC package request form](https://dashboard.aipcc.redhat.com/package-request) or file a Jira under [AIPCC-1](https://issues.redhat.com/browse/AIPCC-1).
 
-**Compiling requirements against AIPCC:**
+**Getting started with AIPCC:**
 
-Point `uv pip compile` at the AIPCC index with `--index` and `--index-strategy first-index`. Add `--emit-index-annotation` to record which index each package came from:
+Start by getting your build working non-hermetically using the AIPCC base image and its pre-configured index. Once your `pip install` succeeds, freeze your dependencies with `uv pip compile` to produce a pinned requirements file that hermeto can prefetch from the AIPCC index.
+
+Point `uv pip compile` at the AIPCC index with `--index` and `--index-strategy first-index`. `--emit-index-annotation` is optional but useful -- it annotates each package with the index it was resolved from, making it easy to trace sourcing:
 
 ```bash
 uv pip compile requirements.in \
@@ -438,6 +440,19 @@ uv pip compile pyproject.toml \
   --index-strategy first-index \
   --emit-index-annotation \
   -o requirements.txt
+```
+
+**Hermeto config for AIPCC:**
+
+Since AIPCC only publishes wheels (no sdists), you must set `binary` in your hermeto config so hermeto knows to fetch wheels. Use `":all:"` to accept wheels for all packages:
+
+```json
+{
+  "type": "pip",
+  "path": ".",
+  "requirements_files": ["requirements.txt"],
+  "binary": { "arch": ":all:" }
+}
 ```
 
 **Multi-variant builds:**
