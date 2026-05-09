@@ -2,7 +2,7 @@
 
 ## What is Hermeto
 
-Hermeto is a CLI tool that pre-fetches project dependencies so that container builds can run without network access (hermetic builds). It downloads all declared dependencies from lockfiles into a local output directory, generates an SBOM, and produces environment files that configure package managers to use the local cache instead of reaching out to the internet. In Konflux, Hermeto replaces the older Cachi2 tool -- the output directory and environment file still use the `/cachi2/` paths for backward compatibility.
+Hermeto is a CLI tool that pre-fetches project dependencies so that container builds can run without network access (hermetic builds). It downloads all declared dependencies from lockfiles into a local output directory, generates an SBOM, and produces environment files that configure package managers to use the local cache instead of reaching out to the internet. Hermeto is the renamed successor of Cachi2 -- the output directory and environment file still use the `/cachi2/` paths for backward compatibility.
 
 ## Installing Hermeto
 
