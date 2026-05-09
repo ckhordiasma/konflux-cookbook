@@ -27,7 +27,7 @@ Read the reference doc at `guides/hermeto-prefetch.md` (relative to the plugin r
    - `make -f Makefile.hermeto-config build-deps` -- find build backends (skip if using binary wheels)
    - `make -f Makefile.hermeto-config rpm-lock` -- resolve RPMs (skip if no rpms.in.yaml)
    - `make -f Makefile.hermeto-config hermeto-config` -- generate hermeto.json
-   - `make -f Makefile.hermeto-build hermeto` -- prefetch everything
+   - `make -f Makefile.hermeto-build prefetch` -- prefetch everything
    - `make -f Makefile.hermeto-build dockerfile` -- generate hermetic Dockerfile
    - `make -f Makefile.hermeto-build build` -- run the offline build
 

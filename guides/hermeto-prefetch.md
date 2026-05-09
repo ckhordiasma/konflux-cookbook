@@ -348,7 +348,7 @@ make -f Makefile.hermeto-config hermeto-config  # generate hermeto.json
 make -f Makefile.hermeto-config clean           # remove generated lockfiles + config
 
 # Build stage (Makefile.hermeto-build)
-make -f Makefile.hermeto-build hermeto          # prefetch everything into .hermeto/
+make -f Makefile.hermeto-build prefetch          # prefetch everything into .hermeto/
 make -f Makefile.hermeto-build dockerfile       # generate hermetic Dockerfile
 make -f Makefile.hermeto-build build            # full offline podman build
 make -f Makefile.hermeto-build clean            # remove .hermeto/ and .hermeto.env
@@ -363,7 +363,7 @@ To test hermetic builds on a different CPU architecture (e.g., x86_64 from an AR
 ```bash
 # On your local machine: generate config and prefetch
 make -f Makefile.hermeto-config
-make -f Makefile.hermeto-build hermeto dockerfile
+make -f Makefile.hermeto-build prefetch dockerfile
 
 # Sync to a remote host
 rsync -az --delete . user@remote-host:/tmp/myproject

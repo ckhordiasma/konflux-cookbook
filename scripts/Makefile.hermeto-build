@@ -7,7 +7,7 @@
 # Usage:
 #
 #   make -f Makefile.hermeto-build build       # full offline podman build
-#   make -f Makefile.hermeto-build hermeto     # prefetch only
+#   make -f Makefile.hermeto-build prefetch     # prefetch only
 #   make -f Makefile.hermeto-build dockerfile  # generate hermetic Dockerfile
 #   make -f Makefile.hermeto-build clean       # remove generated artifacts
 #
@@ -58,7 +58,7 @@ endif
 # Sentinel file that hermeto creates on successful fetch
 HERMETO_SENTINEL := $(HERMETO_OUTPUT)/.build-config.json
 
-.PHONY: all check-podman check-sed hermeto dockerfile build clean
+.PHONY: all check-podman check-sed prefetch dockerfile build clean
 
 # Default target: full build
 all: build
@@ -73,7 +73,7 @@ check-sed:
 	@command -v $(SED) >/dev/null || { echo "ERROR: $(SED) not found"; exit 1; }
 
 # ---------------------------------------------------------------------------
-# hermeto: prefetch all dependencies into $(HERMETO_OUTPUT)/.
+# prefetch: prefetch all dependencies into $(HERMETO_OUTPUT)/.
 # ---------------------------------------------------------------------------
 $(HERMETO_SENTINEL): $(HERMETO_CONFIG)
 	rm -rf $(HERMETO_OUTPUT) && mkdir $(HERMETO_OUTPUT)
@@ -81,7 +81,7 @@ $(HERMETO_SENTINEL): $(HERMETO_CONFIG)
 	$(HERMETO) generate-env $(HERMETO_OUTPUT)/ -o .hermeto.env --for-output-dir /cachi2/output
 	$(HERMETO) inject-files ./$(HERMETO_OUTPUT) --for-output-dir /cachi2/output
 
-hermeto: check-podman $(HERMETO_SENTINEL)
+prefetch: check-podman $(HERMETO_SENTINEL)
 
 # ---------------------------------------------------------------------------
 # dockerfile: generate the hermetic Dockerfile by prepending
