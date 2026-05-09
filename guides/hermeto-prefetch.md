@@ -292,65 +292,87 @@ podman build . \
 
 ## Makefile-Based Workflow
 
-For iterative development, a Makefile lets you run individual stages without re-running everything from scratch. The cookbook includes a parameterized Makefile at `scripts/Makefile.hermeto` that you can copy into your project and configure.
+For iterative development, Makefiles let you run individual stages without re-running everything from scratch. The cookbook includes two parameterized Makefiles that split the workflow into config and build:
+
+- **`Makefile.hermeto-config`** -- Resolves lockfiles and generates `hermeto.json`
+- **`Makefile.hermeto-build`** -- Prefetches dependencies and runs the hermetic build
 
 ### Setup
 
-Copy the Makefile and configure the variables at the top:
+Copy both Makefiles into your project:
 
 ```bash
-cp /path/to/konflux-cookbook/scripts/Makefile.hermeto .
+cp /path/to/konflux-cookbook/scripts/Makefile.hermeto-config .
+cp /path/to/konflux-cookbook/scripts/Makefile.hermeto-build .
 ```
 
-Or override variables on the command line:
+Override variables on the command line:
 
 ```bash
-make -f Makefile.hermeto PYTHON_VERSION=3.12 DOCKERFILE=Dockerfile.konflux build
+make -f Makefile.hermeto-config PYTHON_VERSION=3.12 BINARY_ARCH=x86_64,aarch64
+make -f Makefile.hermeto-build DOCKERFILE=Dockerfile.konflux build
 ```
 
 ### Configuration Variables
+
+**Makefile.hermeto-config:**
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PYTHON_VERSION` | `3.9` | Target Python version (must match base image) |
 | `REQUIREMENTS_IN` | `requirements.in` | Space-separated list of `.in` files to compile |
+| `REQUIREMENTS_FILES` | `requirements.txt` | Requirements files to list in hermeto.json |
+| `REQUIREMENTS_BUILD_FILES` | `requirements-build.txt` | Build-dep files to list in hermeto.json |
+| `BINARY_ARCH` | `x86_64,aarch64,ppc64le,s390x` | Binary wheel architectures |
+| `HERMETO_CONFIG` | `hermeto.json` | Path to generated config |
+
+**Makefile.hermeto-build:**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
 | `HERMETO_CONFIG` | `hermeto.json` | Path to hermeto JSON config |
+| `HERMETO_OUTPUT` | `.hermeto` | Output directory for prefetched deps |
 | `DOCKERFILE` | `Dockerfile.konflux` | Source Dockerfile to transform |
 | `BUILD_CONTEXT` | `.` | Docker build context directory |
-| `HERMETO_OUTPUT` | `.hermeto` | Output directory for prefetched deps |
 
 ### Available Targets
 
 Run any stage independently -- Make tracks file timestamps and skips work that's already done:
 
 ```bash
-make -f Makefile.hermeto pip-compile   # resolve .in -> .txt
-make -f Makefile.hermeto build-deps    # find build backends (pybuild-deps)
-make -f Makefile.hermeto rpm-lock      # generate rpms.lock.yaml
-make -f Makefile.hermeto hermeto       # prefetch everything into .hermeto/
-make -f Makefile.hermeto dockerfile    # generate hermetic Dockerfile
-make -f Makefile.hermeto build         # full offline podman build
-make -f Makefile.hermeto clean         # remove generated artifacts
+# Config stage (Makefile.hermeto-config)
+make -f Makefile.hermeto-config pip-compile     # resolve .in -> .txt
+make -f Makefile.hermeto-config build-deps      # find build backends (pybuild-deps)
+make -f Makefile.hermeto-config rpm-lock        # generate rpms.lock.yaml
+make -f Makefile.hermeto-config hermeto-config  # generate hermeto.json
+make -f Makefile.hermeto-config clean           # remove generated lockfiles + config
+
+# Build stage (Makefile.hermeto-build)
+make -f Makefile.hermeto-build hermeto          # prefetch everything into .hermeto/
+make -f Makefile.hermeto-build dockerfile       # generate hermetic Dockerfile
+make -f Makefile.hermeto-build build            # full offline podman build
+make -f Makefile.hermeto-build clean            # remove .hermeto/ and .hermeto.env
 ```
 
-The `build` target depends on all upstream stages, so `make build` runs everything end-to-end. If you've already run `pip-compile` and only changed `rpms.in.yaml`, running `make build` will skip pip compilation and only re-run what changed.
+Running `make -f Makefile.hermeto-config` with no target runs all config stages end-to-end (pip-compile, build-deps, hermeto-config). Running `make -f Makefile.hermeto-build build` runs the prefetch, Dockerfile transform, and podman build.
 
 ### Testing on Remote Architectures
 
-To test hermetic builds on a different CPU architecture (e.g., x86_64 from an ARM Mac), sync to a remote host and run just the build stage:
+To test hermetic builds on a different CPU architecture (e.g., x86_64 from an ARM Mac), run the config and prefetch locally, then sync to a remote host for just the build:
 
 ```bash
-# On your local machine: run pip-compile and hermeto (these don't need target arch)
-make -f Makefile.hermeto hermeto dockerfile
+# On your local machine: generate config and prefetch
+make -f Makefile.hermeto-config
+make -f Makefile.hermeto-build hermeto dockerfile
 
 # Sync to a remote host
 rsync -az --delete . user@remote-host:/tmp/myproject
 
 # On the remote host: only podman is needed, not uv
-ssh -t user@remote-host 'cd /tmp/myproject && make -f Makefile.hermeto build'
+ssh -t user@remote-host 'cd /tmp/myproject && make -f Makefile.hermeto-build build'
 ```
 
-The `build` target only requires `podman` -- it doesn't need `uv` or other tools that are only used during the resolution stages. This makes it easy to test on minimal hosts.
+The build Makefile only requires `podman` -- it doesn't need `uv` or other tools that are only used during the config stage. This makes it easy to test on minimal hosts.
 
 ## Dockerfile Reference
 

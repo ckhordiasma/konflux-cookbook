@@ -20,17 +20,18 @@ Read the reference doc at `guides/hermeto-prefetch.md` (relative to the plugin r
 
 5. **Generate `rpms.in.yaml`** (if needed): If the Dockerfile installs system packages with `microdnf` or `dnf`, create `rpms.in.yaml` listing those packages and all target architectures. Set the `context.containerfile` to point at the Dockerfile and the correct build stage.
 
-6. **Copy and configure `Makefile.hermeto`**: Copy `scripts/Makefile.hermeto` from the cookbook into the project. Set the configuration variables (`PYTHON_VERSION`, `REQUIREMENTS_IN`, `DOCKERFILE`, `BUILD_CONTEXT`) to match the project layout.
+6. **Copy and configure Makefiles**: Copy `scripts/Makefile.hermeto-config` and `scripts/Makefile.hermeto-build` from the cookbook into the project. Set the configuration variables (`PYTHON_VERSION`, `REQUIREMENTS_IN`, `BINARY_ARCH`, `DOCKERFILE`, `BUILD_CONTEXT`) to match the project layout.
 
 7. **Run the Makefile stages**: Walk through the stages to verify the hermetic build works:
-   - `make -f Makefile.hermeto pip-compile` -- compile requirements
-   - `make -f Makefile.hermeto build-deps` -- find build backends (skip if using binary wheels)
-   - `make -f Makefile.hermeto rpm-lock` -- resolve RPMs (skip if no rpms.in.yaml)
-   - `make -f Makefile.hermeto hermeto` -- prefetch everything
-   - `make -f Makefile.hermeto dockerfile` -- generate hermetic Dockerfile
-   - `make -f Makefile.hermeto build` -- run the offline build
+   - `make -f Makefile.hermeto-config pip-compile` -- compile requirements
+   - `make -f Makefile.hermeto-config build-deps` -- find build backends (skip if using binary wheels)
+   - `make -f Makefile.hermeto-config rpm-lock` -- resolve RPMs (skip if no rpms.in.yaml)
+   - `make -f Makefile.hermeto-config hermeto-config` -- generate hermeto.json
+   - `make -f Makefile.hermeto-build hermeto` -- prefetch everything
+   - `make -f Makefile.hermeto-build dockerfile` -- generate hermetic Dockerfile
+   - `make -f Makefile.hermeto-build build` -- run the offline build
 
 8. **Summarize**: Report what was created and next steps:
-   - Files to commit: `hermeto.json`, `rpms.in.yaml`, `rpms.lock.yaml`, `Makefile.hermeto`, compiled requirements files
+   - Files to commit: `hermeto.json`, `rpms.in.yaml`, `rpms.lock.yaml`, `Makefile.hermeto-config`, `Makefile.hermeto-build`, compiled requirements files
    - Files to gitignore: `.hermeto/`, `.hermeto.env`
    - Remind the user to set up the Konflux PR pipeline with hermeto prefetch tasks if not already done

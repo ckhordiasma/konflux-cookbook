@@ -1,0 +1,133 @@
+# Makefile.hermeto-config — Generate lockfiles and hermeto.json
+#
+# This Makefile produces the inputs that hermeto needs: pinned requirements
+# files, build backend lists, RPM lockfiles, and the hermeto.json config.
+#
+# Usage:
+#
+#   make -f Makefile.hermeto-config                # run everything
+#   make -f Makefile.hermeto-config pip-compile    # resolve .in -> .txt
+#   make -f Makefile.hermeto-config build-deps     # find build backends
+#   make -f Makefile.hermeto-config rpm-lock       # generate rpms.lock.yaml
+#   make -f Makefile.hermeto-config hermeto-config # generate hermeto.json
+#   make -f Makefile.hermeto-config clean          # remove generated files
+#
+# Override variables on the command line:
+#
+#   make -f Makefile.hermeto-config PYTHON_VERSION=3.12 BINARY_ARCH=x86_64,aarch64
+
+# ---------------------------------------------------------------------------
+# Configuration — edit these for your project
+# ---------------------------------------------------------------------------
+
+# Target Python version (must match the base image)
+PYTHON_VERSION ?= 3.9
+
+# Space-separated list of requirements .in files to compile
+REQUIREMENTS_IN ?= requirements.in
+
+# Requirements files to list in hermeto.json
+REQUIREMENTS_FILES ?= requirements.txt
+
+# Build-dependency files to list in hermeto.json
+REQUIREMENTS_BUILD_FILES ?= requirements-build.txt
+
+# Binary wheel architectures
+BINARY_ARCH ?= x86_64,aarch64,ppc64le,s390x
+
+# Hermeto config file to generate
+HERMETO_CONFIG ?= hermeto.json
+
+# ---------------------------------------------------------------------------
+# Derived values — normally you don't need to change these
+# ---------------------------------------------------------------------------
+
+# Compiled .txt files (one per .in file)
+REQUIREMENTS_TXT := $(REQUIREMENTS_IN:.in=.txt)
+
+# Build-dependencies output
+REQUIREMENTS_BUILD := requirements-build.txt
+
+# uv pip compile flags targeting a Linux build environment
+UV_COMPILE := uv pip compile --python-platform linux --python-version $(PYTHON_VERSION) \
+  --index-strategy first-index --emit-index-annotation
+
+# JSON array helpers
+_json_list = $(shell echo '$(1)' | python3 -c "import sys; print('[' + ', '.join('\"' + f + '\"' for f in sys.stdin.read().split()) + ']')")
+
+.PHONY: all check-uv check-podman check-rpm-lockfile \
+  pip-compile build-deps rpm-lock hermeto-config clean
+
+# Default target: run everything
+all: pip-compile build-deps hermeto-config
+
+# ---------------------------------------------------------------------------
+# check-*: per-tool dependency checks
+# ---------------------------------------------------------------------------
+check-uv:
+	@command -v uv >/dev/null || { echo "ERROR: uv not found — install with: curl -LsSf https://astral.sh/uv/install.sh | sh"; exit 1; }
+
+check-podman:
+	@command -v podman >/dev/null || { echo "ERROR: podman not found"; exit 1; }
+
+check-rpm-lockfile: check-podman
+	@podman image exists localhost/rpm-lockfile-prototype:latest 2>/dev/null \
+	  || { echo "==> Building rpm-lockfile-prototype image ..."; \
+	       curl -sL https://raw.githubusercontent.com/konflux-ci/rpm-lockfile-prototype/refs/heads/main/Containerfile \
+	         | podman build -t localhost/rpm-lockfile-prototype -; }
+
+# ---------------------------------------------------------------------------
+# pip-compile: resolve .in files into fully-pinned requirements.txt files.
+# ---------------------------------------------------------------------------
+
+%.txt: %.in
+	$(UV_COMPILE) -o $@ $<
+
+pip-compile: check-uv $(REQUIREMENTS_TXT)
+
+# ---------------------------------------------------------------------------
+# build-deps: find build backends (hatchling, maturin, etc.) needed to
+# compile source distributions.
+# ---------------------------------------------------------------------------
+$(REQUIREMENTS_BUILD): $(REQUIREMENTS_TXT)
+	uv run --python $(PYTHON_VERSION) --with pybuild-deps pybuild-deps compile $^ -o $@
+
+build-deps: check-uv $(REQUIREMENTS_BUILD)
+
+# ---------------------------------------------------------------------------
+# rpm-lock: resolve RPM packages into a lockfile.
+# ---------------------------------------------------------------------------
+rpms.lock.yaml: rpms.in.yaml
+	podman run --rm -v "$(CURDIR):/work:Z" localhost/rpm-lockfile-prototype:latest \
+	  --outfile=rpms.lock.yaml rpms.in.yaml
+
+rpm-lock: check-rpm-lockfile rpms.lock.yaml
+
+# ---------------------------------------------------------------------------
+# hermeto-config: generate hermeto.json from Make variables.
+# ---------------------------------------------------------------------------
+$(HERMETO_CONFIG):
+	@python3 -c "\
+	import json, os; \
+	req_files = '$(REQUIREMENTS_FILES)'.split(); \
+	build_files = '$(REQUIREMENTS_BUILD_FILES)'.split(); \
+	pip = { \
+	    'type': 'pip', \
+	    'path': '.', \
+	    'requirements_files': req_files, \
+	    'requirements_build_files': build_files, \
+	    'binary': {'arch': '$(BINARY_ARCH)'} \
+	}; \
+	entries = [pip]; \
+	if os.path.exists('rpms.lock.yaml') or os.path.exists('rpms.in.yaml'): \
+	    entries.append({'type': 'rpm', 'path': '.'}); \
+	print(json.dumps(entries, indent=2))" > $@
+	@echo "Generated $@"
+
+hermeto-config: $(HERMETO_CONFIG)
+
+# ---------------------------------------------------------------------------
+# clean: remove generated artifacts
+# ---------------------------------------------------------------------------
+clean:
+	rm -f $(REQUIREMENTS_TXT) $(REQUIREMENTS_BUILD) rpms.lock.yaml $(HERMETO_CONFIG)

@@ -1,0 +1,115 @@
+# Makefile.hermeto-build — Prefetch and hermetic build using Hermeto
+#
+# This Makefile takes a hermeto.json config and lockfiles as inputs,
+# runs hermeto to prefetch dependencies, and builds the container
+# image offline.
+#
+# Usage:
+#
+#   make -f Makefile.hermeto-build build       # full offline podman build
+#   make -f Makefile.hermeto-build hermeto     # prefetch only
+#   make -f Makefile.hermeto-build dockerfile  # generate hermetic Dockerfile
+#   make -f Makefile.hermeto-build clean       # remove generated artifacts
+#
+# Override variables on the command line:
+#
+#   make -f Makefile.hermeto-build DOCKERFILE=Dockerfile.konflux build
+
+# ---------------------------------------------------------------------------
+# Configuration — edit these for your project
+# ---------------------------------------------------------------------------
+
+# Hermeto config file (produced by Makefile.hermeto-config or written by hand)
+HERMETO_CONFIG ?= hermeto.json
+
+# Hermeto output directory
+HERMETO_OUTPUT ?= .hermeto
+
+# Source Dockerfile to transform for hermetic builds
+DOCKERFILE ?= Dockerfile.konflux
+
+# Docker build context directory
+BUILD_CONTEXT ?= .
+
+# ---------------------------------------------------------------------------
+# Derived values — normally you don't need to change these
+# ---------------------------------------------------------------------------
+
+# Hermetic Dockerfile (generated inside the output directory)
+HERMETO_DOCKERFILE := $(HERMETO_OUTPUT)/$(notdir $(DOCKERFILE))
+
+# CPU architecture, mapping macOS arm64 to Linux aarch64
+ARCH := $(shell uname -m)
+ifeq ($(ARCH),arm64)
+  ARCH := aarch64
+endif
+
+# Run hermeto via its container image
+HERMETO := podman run --rm -ti -v "$(CURDIR):$(CURDIR):z" -w "$(CURDIR)" \
+  ghcr.io/hermetoproject/hermeto:latest
+
+# Use gsed on macOS, sed on Linux
+ifeq ($(shell uname -s),Darwin)
+  SED := gsed
+else
+  SED := sed
+endif
+
+# Sentinel file that hermeto creates on successful fetch
+HERMETO_SENTINEL := $(HERMETO_OUTPUT)/.build-config.json
+
+.PHONY: all check-podman check-sed hermeto dockerfile build clean
+
+# Default target: full build
+all: build
+
+# ---------------------------------------------------------------------------
+# check-*: per-tool dependency checks
+# ---------------------------------------------------------------------------
+check-podman:
+	@command -v podman >/dev/null || { echo "ERROR: podman not found"; exit 1; }
+
+check-sed:
+	@command -v $(SED) >/dev/null || { echo "ERROR: $(SED) not found"; exit 1; }
+
+# ---------------------------------------------------------------------------
+# hermeto: prefetch all dependencies into $(HERMETO_OUTPUT)/.
+# ---------------------------------------------------------------------------
+$(HERMETO_SENTINEL): $(HERMETO_CONFIG)
+	rm -rf $(HERMETO_OUTPUT) && mkdir $(HERMETO_OUTPUT)
+	$(HERMETO) fetch-deps --source . --output $(HERMETO_OUTPUT) $(HERMETO_CONFIG)
+	$(HERMETO) generate-env $(HERMETO_OUTPUT)/ -o .hermeto.env --for-output-dir /cachi2/output
+	$(HERMETO) inject-files ./$(HERMETO_OUTPUT) --for-output-dir /cachi2/output
+
+hermeto: check-podman $(HERMETO_SENTINEL)
+
+# ---------------------------------------------------------------------------
+# dockerfile: generate the hermetic Dockerfile by prepending
+# `. /cachi2/cachi2.env &&` to every RUN instruction.
+# ---------------------------------------------------------------------------
+$(HERMETO_DOCKERFILE): $(DOCKERFILE)
+	@mkdir -p $(HERMETO_OUTPUT)
+	$(SED) -E \
+	  -e 'H;1h;$$!d;x' \
+	  -e 's@^\s*(run((\s|\\\n)+-\S+)*(\s|\\\n)+)@\1. /cachi2/cachi2.env \&\& \\\n    @igM' \
+	  $< > $@
+
+dockerfile: check-sed $(HERMETO_DOCKERFILE)
+
+# ---------------------------------------------------------------------------
+# build: run the podman build fully offline with prefetched deps mounted in.
+# ---------------------------------------------------------------------------
+build: $(HERMETO_SENTINEL) $(HERMETO_DOCKERFILE)
+	podman build \
+	  --no-cache \
+	  --network none \
+	  --volume "$(realpath ./$(HERMETO_OUTPUT))":/cachi2/output:Z \
+	  --volume "$(realpath ./.hermeto.env)":/cachi2/cachi2.env:Z \
+	  --volume "$(realpath ./$(HERMETO_OUTPUT))/deps/rpm/$(ARCH)/repos.d":/etc/yum.repos.d:Z \
+	  -f $(HERMETO_DOCKERFILE) $(BUILD_CONTEXT)
+
+# ---------------------------------------------------------------------------
+# clean: remove all generated artifacts
+# ---------------------------------------------------------------------------
+clean:
+	rm -rf $(HERMETO_OUTPUT) .hermeto.env
