@@ -6,27 +6,30 @@ Hermeto is a CLI tool that pre-fetches project dependencies so that container bu
 
 ## Installing Hermeto
 
-### Container 
+The easiest way to run hermeto locally is through its container image. Set up a shell alias so you can use `hermeto` as if it were installed natively:
 
 ```bash
 alias hermeto='podman run --rm -ti -v "$PWD:$PWD:z" -w "$PWD" \
   ghcr.io/hermetoproject/hermeto:latest'
 ```
 
-This mounts your project directory into the container so Hermeto can read lockfiles and write output.
+The `-v "$PWD:$PWD:z"` flag bind-mounts your project directory into the container so hermeto can read your lockfiles and write output, and `-w "$PWD"` sets the working directory to match. All `hermeto` commands in this guide assume this alias is in place.
 
 ## Configuring `hermeto.json`
 
-The hermeto config defines which package managers to prefetch and how. It is a JSON array of package manager objects, each with a `type` field and manager-specific options. In this guide, we save it to a file called `hermeto.json` for local testing, but in your Konflux build pipeline the JSON is typically inlined as a parameter to the prefetch task.
+The first step is to create a correct hermeto config. This is a JSON array of package manager objects, each with a `type` field and manager-specific options. In this guide, we save it to a file called `hermeto.json` for local testing, but in your Konflux build pipeline the JSON is typically inlined as a parameter to the prefetch task.
 
-For local testing:
+Hermeto supports the following package managers -- jump to the one(s) your project uses:
 
-```bash
-hermeto fetch-deps \
-  --source . \
-  --output .hermeto \
-  hermeto.json
-```
+| Type | Language | Section |
+|------|----------|---------|
+| `pip` | Python | [pip (Python)](#pip-python) |
+| `cargo` | Rust | [cargo (Rust)](#cargo-rust) |
+| `gomod` | Go | [gomod (Go)](#gomod-go) |
+| `npm` | JavaScript | [npm (JavaScript)](#npm-javascript) |
+| `yarn` | JavaScript | [yarn (JavaScript)](#yarn-javascript) |
+| `bundler` | Ruby | [bundler (Ruby)](#bundler-ruby) |
+| `rpm` | System packages | [rpm](#rpm) |
 
 A typical multi-manager config:
 
@@ -47,6 +50,17 @@ A typical multi-manager config:
   }
 ]
 ```
+
+Once you have your config, use `hermeto fetch-deps` to download all the dependencies it defines:
+
+```bash
+hermeto fetch-deps \
+  --source . \
+  --output .hermeto \
+  hermeto.json
+```
+
+See [Building with Prefetched Dependencies](#building-with-prefetched-dependencies) for how to use the prefetched output in a hermetic build.
 
 ### pip (Python)
 
@@ -215,7 +229,7 @@ Prefetches system RPM packages. Requires an `rpms.lock.yaml` lockfile (see [RPM 
 {"type": "rpm", "path": "."}
 ```
 
-## Basic Usage
+## Building with Prefetched Dependencies
 
 The core workflow has three steps: fetch dependencies, generate the environment file, and inject any config files package managers need.
 
@@ -228,15 +242,6 @@ hermeto fetch-deps \
   --source . \
   --output .hermeto \
   hermeto.json
-```
-
-You can also pass the package manager config inline as a string or simple keyword:
-
-```bash
-hermeto fetch-deps \
-  --source . \
-  --output .hermeto \
-  pip
 ```
 
 ### 2. Generate the environment file
