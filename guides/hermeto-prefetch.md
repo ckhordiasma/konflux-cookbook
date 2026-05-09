@@ -496,7 +496,7 @@ Since AIPCC only publishes wheels (no sdists), you must set `binary` in your her
 
 **Multi-variant builds:**
 
-For components that build for multiple accelerators (CPU, CUDA, ROCm), maintain separate requirements files per variant (e.g., `requirements.cpu.txt`, `requirements.cuda.txt`) and use build-args to select the right one at build time. The notebooks component uses this pattern with a `build-args/konflux.{variant}.conf` file that sets the index URL and base image.
+If your component builds for multiple accelerators (CPU, CUDA, ROCm), you may want to maintain separate requirements files per variant (e.g., `requirements.cpu.txt`, `requirements.cuda.txt`) and use build-args to select the right one at build time. The notebooks component does this with a `build-args/konflux.{variant}.conf` file that sets the index URL and base image for each variant (e.g., [CPU config](https://github.com/red-hat-data-services/notebooks/blob/1e60d9cb49ec28740e89ac8ce5ded897f86f775b/jupyter/datascience/ubi9-python-3.12/build-args/konflux.cpu.conf), [CUDA config](https://github.com/red-hat-data-services/notebooks/blob/1e60d9cb49ec28740e89ac8ce5ded897f86f775b/jupyter/pytorch/ubi9-python-3.12/build-args/konflux.cuda.conf)).
 
 ### Building from source for missing architectures
 
