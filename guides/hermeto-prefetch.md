@@ -309,7 +309,7 @@ cp /path/to/konflux-cookbook/scripts/Makefile.hermeto-build .
 Override variables on the command line:
 
 ```bash
-make -f Makefile.hermeto-config PYTHON_VERSION=3.12 BINARY_ARCH=x86_64,aarch64
+make -f Makefile.hermeto-config PYTHON_VERSION=3.12 PIP_INPUT=pyproject.toml
 make -f Makefile.hermeto-build DOCKERFILE=Dockerfile.konflux build
 ```
 
@@ -320,10 +320,14 @@ make -f Makefile.hermeto-build DOCKERFILE=Dockerfile.konflux build
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PYTHON_VERSION` | `3.9` | Target Python version (must match base image) |
-| `REQUIREMENTS_IN` | `requirements.in` | Space-separated list of `.in` files to compile |
-| `REQUIREMENTS_FILES` | `requirements.txt` | Requirements files to list in hermeto.json |
-| `REQUIREMENTS_BUILD_FILES` | `requirements-build.txt` | Build-dep files to list in hermeto.json |
+| `PIP_INPUT` | `requirements.in` | Input file to compile (`requirements.in`, `pyproject.toml`, etc.) |
+| `PIP_OUTPUT` | `requirements.txt` | Output pinned requirements file |
+| `REQUIREMENTS_BUILD` | `requirements-build.txt` | Build-dep output file (empty to skip) |
+| `INDEX_URL` | *(empty)* | Custom package index URL (e.g., AIPCC) |
+| `EXTRA_UV_ARGS` | *(empty)* | Extra args for uv pip compile (e.g., `--extra server`) |
 | `BINARY_ARCH` | `x86_64,aarch64,ppc64le,s390x` | Binary wheel architectures |
+| `REQUIREMENTS_FILES` | `$(PIP_OUTPUT)` | Requirements files to list in hermeto.json |
+| `REQUIREMENTS_BUILD_FILES` | `$(REQUIREMENTS_BUILD)` | Build-dep files to list in hermeto.json |
 | `HERMETO_CONFIG` | `hermeto.json` | Path to generated config |
 
 **Makefile.hermeto-build:**
