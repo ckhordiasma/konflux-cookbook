@@ -99,13 +99,16 @@ dockerfile: check-sed $(HERMETO_DOCKERFILE)
 # ---------------------------------------------------------------------------
 # build: run the podman build fully offline with prefetched deps mounted in.
 # ---------------------------------------------------------------------------
+RPM_REPOS_DIR := $(HERMETO_OUTPUT)/deps/rpm/$(ARCH)/repos.d
+RPM_VOLUME := $(shell test -d $(RPM_REPOS_DIR) && echo '--volume "$(realpath ./$(RPM_REPOS_DIR))":/etc/yum.repos.d:Z')
+
 build: $(HERMETO_SENTINEL) $(HERMETO_DOCKERFILE)
 	podman build \
 	  --no-cache \
 	  --network none \
 	  --volume "$(realpath ./$(HERMETO_OUTPUT))":/cachi2/output:Z \
 	  --volume "$(realpath ./.hermeto.env)":/cachi2/cachi2.env:Z \
-	  --volume "$(realpath ./$(HERMETO_OUTPUT))/deps/rpm/$(ARCH)/repos.d":/etc/yum.repos.d:Z \
+	  $(RPM_VOLUME) \
 	  -f $(HERMETO_DOCKERFILE) $(BUILD_CONTEXT)
 
 # ---------------------------------------------------------------------------
