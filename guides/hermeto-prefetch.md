@@ -520,14 +520,13 @@ uv run --python 3.12 --with pybuild-deps pybuild-deps compile \
 
 This produces a file with cmake, ninja, numpy, cython, and other build backends that torch needs.
 
-**3. Keep torch as a version pin in your main requirements:**
+**3. Pin torch to the same version in your main requirements:**
 
-`requirements.in`:
-```
-torch==2.11.0
-```
+The compiled `requirements.txt` must have `torch==2.11.0` as a version pin (not a URL reference) so that hermeto prefetches the PyPI wheels for architectures that have them (x86_64, aarch64). How you achieve this depends on your project setup:
 
-Compile as normal with `uv pip compile`. The output `requirements.txt` will have `torch==2.11.0` as a version pin, not a URL reference. This ensures hermeto prefetches the PyPI wheels for architectures that have them (x86_64, aarch64).
+- **In `requirements.in`:** add `torch==2.11.0`, then run `uv pip compile`
+- **In `pyproject.toml`:** add `"torch==2.11.0"` to your dependencies, then compile with `uv pip compile pyproject.toml`
+- **Inline:** pass the constraint directly: `uv pip compile requirements.in --constraint <(echo 'torch==2.11.0')`
 
 **4. Configure hermeto to fetch both wheels and the source tarball:**
 
