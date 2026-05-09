@@ -32,5 +32,5 @@ Read the reference doc at `guides/hermeto-prefetch.md` (relative to the plugin r
 
 8. **Summarize**: Report what was created and next steps:
    - Files to commit: `hermeto.json`, `rpms.in.yaml`, `rpms.lock.yaml`, `Makefile.hermeto`, compiled requirements files
-   - Files to gitignore: `.hermeto/`, `.hermeto.env`, the generated `.hermeto.Dockerfile.*`
+   - Files to gitignore: `.hermeto/`, `.hermeto.env`
    - Remind the user to set up the Konflux PR pipeline with hermeto prefetch tasks if not already done

@@ -231,11 +231,11 @@ Prefetches system RPM packages. Requires an `rpms.lock.yaml` lockfile (see [RPM 
 
 ## Building with Prefetched Dependencies
 
-The core workflow has three steps: fetch dependencies, generate the environment file, and inject any config files package managers need.
+Once you have a correct `hermeto.json` (see [Configuring hermeto.json](#configuring-hermetojson)), these steps download the dependencies and set up your build to use them offline.
 
 ### 1. Fetch dependencies
 
-Assuming you are in the root level of your project directory:
+This is where hermeto actually downloads all the dependencies defined by your config into a local output directory:
 
 ```bash
 hermeto fetch-deps \
@@ -244,14 +244,27 @@ hermeto fetch-deps \
   hermeto.json
 ```
 
-### 2. Generate the environment file
+### 2. Generate the environment file and modify the Dockerfile
 
 ```bash
 hermeto generate-env .hermeto/ -o .hermeto.env \
   --for-output-dir /cachi2/output
 ```
 
-The `--for-output-dir` flag sets the absolute path where the output will be mounted inside the build container. For Konflux builds this is `/cachi2/output`.
+This creates a file containing the environment variables that configure package managers (pip, cargo, npm, etc.) to install from the prefetched cache instead of the network. The `--for-output-dir` flag sets the absolute path where the output will be mounted inside the build container -- for Konflux builds this is `/cachi2/output`.
+
+This environment file must be sourced before every `RUN` command in your Dockerfile that installs dependencies. In the Konflux build task, [this is handled automatically](https://github.com/konflux-ci/build-definitions/blob/44ffba6bd5e8a3da0511b13677b3a0982ae6722e/task/buildah-oci-ta/0.8/buildah-oci-ta.yaml#L749-L754) by using sed to inject `. /cachi2/cachi2.env &&` at the start of every `RUN` instruction.
+
+For local testing, generate a modified copy of your Dockerfile with the same sed command rather than editing the original in-place (the Makefile also takes this approach):
+
+```bash
+sed -E \
+  -e 'H;1h;$!d;x' \
+  -e 's@^\s*(run((\s|\\\n)+-\S+)*(\s|\\\n)+)@\1. /cachi2/cachi2.env \&\& \\\n    @igM' \
+  Dockerfile.konflux > .hermeto/Dockerfile.konflux
+```
+
+This produces `.hermeto/Dockerfile.konflux` with the env file sourced in every `RUN` command, leaving your original Dockerfile untouched. Use this generated Dockerfile for the local hermetic build in step 4.
 
 ### 3. Inject configuration files
 
@@ -259,7 +272,7 @@ The `--for-output-dir` flag sets the absolute path where the output will be moun
 hermeto inject-files ./.hermeto --for-output-dir /cachi2/output
 ```
 
-This modifies project files (e.g., creates `.cargo/config.toml` for Cargo) so that package managers point at the local cache. Run this before committing -- it may overwrite files in your working tree.
+Some package managers need config files created or modified to point at the local cache -- for example, cargo requires a `.cargo/config.toml` with the local registry path, and gomod needs `GONOSUMDB`/`GONOSUMCHECK` settings. This step handles that automatically. Not all package managers need it (pip and rpm do not), but it is safe to run regardless. Note that this may overwrite files in your working tree.
 
 ### 4. Test locally with a hermetic build
 
@@ -267,11 +280,15 @@ This modifies project files (e.g., creates `.cargo/config.toml` for Cargo) so th
 podman build . \
   --volume "$(realpath ./.hermeto)":/cachi2/output:Z \
   --volume "$(realpath ./.hermeto.env)":/cachi2/cachi2.env:Z \
+  --volume "$(realpath ./.hermeto)/deps/rpm/$(uname -m)/repos.d":/etc/yum.repos.d:Z \
   --network none \
-  -f Dockerfile.konflux
+  -f .hermeto/Dockerfile.konflux
 ```
 
-The `--network none` flag proves that all dependencies are actually prefetched.
+- `--network none` proves that all dependencies are actually prefetched.
+- The `.` after `podman build` is the build context directory -- change it if your Dockerfile expects a different context (e.g., a subdirectory).
+- The RPM `repos.d` volume mount is only needed if you use the RPM prefetcher. Omit it if you don't prefetch RPMs.
+- On Apple Silicon Macs, `uname -m` returns `arm64` but the RPM repo path uses the Linux name `aarch64`. Replace `$(uname -m)` with `aarch64` explicitly.
 
 ## Makefile-Based Workflow
 
@@ -335,19 +352,15 @@ ssh -t user@remote-host 'cd /tmp/myproject && make -f Makefile.hermeto build'
 
 The `build` target only requires `podman` -- it doesn't need `uv` or other tools that are only used during the resolution stages. This makes it easy to test on minimal hosts.
 
-## Modifying Your Dockerfile.konflux
+## Dockerfile Reference
 
-A Konflux hermetic build mounts the prefetched dependencies at `/cachi2/output` and the environment file at `/cachi2/cachi2.env`. Your `Dockerfile.konflux` needs to source that env file before any install commands.
-
-Here is the typical pattern:
+For reference, here is what a Dockerfile looks like with the env file sourced manually (this is what the sed command in [step 2](#2-generate-the-environment-file-and-modify-the-dockerfile) automates):
 
 ```dockerfile
 FROM registry.access.redhat.com/ubi9/python-312-minimal AS base
 
 USER 0
 
-# Source cachi2.env so pip/cargo find the prefetched deps.
-# Install system packages in the same RUN to keep layers small.
 RUN . /cachi2/cachi2.env && \
     microdnf install -y gcc make python3.12-devel cargo && \
     microdnf clean all
@@ -355,7 +368,6 @@ RUN . /cachi2/cachi2.env && \
 WORKDIR /app
 COPY ./requirements.txt ./
 
-# Install Python dependencies from the prefetched cache
 RUN . /cachi2/cachi2.env && \
     python -m pip install -r requirements.txt
 
@@ -364,11 +376,7 @@ USER 1001
 ENTRYPOINT ["python", "-m", "myapp"]
 ```
 
-Key points:
-
-- **Source the env file in every `RUN` that installs dependencies.** Each `RUN` is a separate shell, so `. /cachi2/cachi2.env` must appear in each one that calls pip, cargo, npm, etc.
-- **Do not combine sourcing with `&&` after a `COPY`.** The env file is mounted by the build system, not copied from your repo.
-- For **Cargo + pip** projects (e.g., Python packages with Rust extensions), the env file configures both pip and cargo at once.
+Each `RUN` is a separate shell, so `. /cachi2/cachi2.env` must appear in every one that calls pip, cargo, npm, etc. For **Cargo + pip** projects (e.g., Python packages with Rust extensions), the env file configures both package managers at once.
 
 ## Python Requirements
 

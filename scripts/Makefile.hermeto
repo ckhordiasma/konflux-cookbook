@@ -52,7 +52,7 @@ REQUIREMENTS_TXT := $(REQUIREMENTS_IN:.in=.txt)
 REQUIREMENTS_BUILD := requirements-build.txt
 
 # Hermetic Dockerfile (generated)
-HERMETO_DOCKERFILE := $(dir $(DOCKERFILE)).hermeto.$(notdir $(DOCKERFILE))
+HERMETO_DOCKERFILE := $(HERMETO_OUTPUT)/$(notdir $(DOCKERFILE))
 
 # CPU architecture, mapping macOS arm64 to Linux aarch64
 ARCH := $(shell uname -m)
@@ -169,4 +169,4 @@ build: $(HERMETO_SENTINEL) $(HERMETO_DOCKERFILE)
 # clean: remove all generated artifacts
 # ---------------------------------------------------------------------------
 clean:
-	rm -rf $(HERMETO_OUTPUT) .hermeto.env $(HERMETO_DOCKERFILE)
+	rm -rf $(HERMETO_OUTPUT) .hermeto.env
