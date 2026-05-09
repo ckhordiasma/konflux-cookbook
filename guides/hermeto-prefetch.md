@@ -15,9 +15,9 @@ alias hermeto='podman run --rm -ti -v "$PWD:$PWD:z" -w "$PWD" \
 
 This mounts your project directory into the container so Hermeto can read lockfiles and write output.
 
-## Configuring `.hermeto.json`
+## Configuring `hermeto.json`
 
-The hermeto config defines which package managers to prefetch and how. It is a JSON array of package manager objects, each with a `type` field and manager-specific options. In this guide, we save it to a file called `.hermeto.json` for local testing, but in your Konflux build pipeline the JSON is typically inlined as a parameter to the prefetch task.
+The hermeto config defines which package managers to prefetch and how. It is a JSON array of package manager objects, each with a `type` field and manager-specific options. In this guide, we save it to a file called `hermeto.json` for local testing, but in your Konflux build pipeline the JSON is typically inlined as a parameter to the prefetch task.
 
 For local testing:
 
@@ -25,7 +25,7 @@ For local testing:
 hermeto fetch-deps \
   --source . \
   --output .hermeto \
-  .hermeto.json
+  hermeto.json
 ```
 
 A typical multi-manager config:
@@ -227,7 +227,7 @@ Assuming you are in the root level of your project directory:
 hermeto fetch-deps \
   --source . \
   --output .hermeto \
-  .hermeto.json
+  hermeto.json
 ```
 
 You can also pass the package manager config inline as a string or simple keyword:
@@ -292,7 +292,7 @@ make -f Makefile.hermeto PYTHON_VERSION=3.12 DOCKERFILE=Dockerfile.konflux build
 |----------|---------|-------------|
 | `PYTHON_VERSION` | `3.9` | Target Python version (must match base image) |
 | `REQUIREMENTS_IN` | `requirements.in` | Space-separated list of `.in` files to compile |
-| `HERMETO_CONFIG` | `.hermeto.json` | Path to hermeto JSON config |
+| `HERMETO_CONFIG` | `hermeto.json` | Path to hermeto JSON config |
 | `DOCKERFILE` | `Dockerfile.konflux` | Source Dockerfile to transform |
 | `BUILD_CONTEXT` | `.` | Docker build context directory |
 | `HERMETO_OUTPUT` | `.hermeto` | Output directory for prefetched deps |

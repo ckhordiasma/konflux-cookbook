@@ -30,7 +30,7 @@ PYTHON_VERSION ?= 3.9
 REQUIREMENTS_IN ?= requirements.in
 
 # Hermeto config file
-HERMETO_CONFIG ?= .hermeto.json
+HERMETO_CONFIG ?= hermeto.json
 
 # Source Dockerfile to transform for hermetic builds
 DOCKERFILE ?= Dockerfile.konflux

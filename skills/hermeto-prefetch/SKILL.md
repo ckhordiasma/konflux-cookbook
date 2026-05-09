@@ -16,7 +16,7 @@ Read the reference doc at `guides/hermeto-prefetch.md` (relative to the plugin r
 
 3. **Determine target Python version**: Read the project's Dockerfile to identify the base image and Python version. This version must match the `--python-version` flag used during requirements compilation.
 
-4. **Generate `.hermeto.json`**: Create the hermeto config file listing all package managers and their requirements files. If the project uses pip with multiple requirements files, list them all. Enable binary wheels with multi-arch support if the project has packages with native extensions (Rust, C).
+4. **Generate `hermeto.json`**: Create the hermeto config file listing all package managers and their requirements files. If the project uses pip with multiple requirements files, list them all. Enable binary wheels with multi-arch support if the project has packages with native extensions (Rust, C).
 
 5. **Generate `rpms.in.yaml`** (if needed): If the Dockerfile installs system packages with `microdnf` or `dnf`, create `rpms.in.yaml` listing those packages and all target architectures. Set the `context.containerfile` to point at the Dockerfile and the correct build stage.
 
@@ -31,6 +31,6 @@ Read the reference doc at `guides/hermeto-prefetch.md` (relative to the plugin r
    - `make -f Makefile.hermeto build` -- run the offline build
 
 8. **Summarize**: Report what was created and next steps:
-   - Files to commit: `.hermeto.json`, `rpms.in.yaml`, `rpms.lock.yaml`, `Makefile.hermeto`, compiled requirements files
+   - Files to commit: `hermeto.json`, `rpms.in.yaml`, `rpms.lock.yaml`, `Makefile.hermeto`, compiled requirements files
    - Files to gitignore: `.hermeto/`, `.hermeto.env`, the generated `.hermeto.Dockerfile.*`
    - Remind the user to set up the Konflux PR pipeline with hermeto prefetch tasks if not already done
