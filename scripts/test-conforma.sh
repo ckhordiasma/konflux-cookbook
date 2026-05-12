@@ -84,11 +84,14 @@ if [ -n "$IMAGE" ]; then
 
   COMMAND="ec validate image --ignore-rekor true --image $IMAGE --public-key $PUBKEY --policy $POLICY_FILE --info --output yaml --timeout 30m0s $VERBOSE_FLAG"
 
+  HEADER="# ec command: $COMMAND
+# image: $IMAGE"
+
   echo "=== Running EC validation ==="
   echo "Image: $IMAGE"
   echo "$COMMAND"
   SECONDS=0
-  $COMMAND | tee $RESULTS_FILE
+  { echo "$HEADER"; $COMMAND; } | tee $RESULTS_FILE
   EC_EXIT=$?
   DURATION=$SECONDS
 
@@ -108,7 +111,7 @@ else
   echo "=== Fetching snapshot ==="
   SECONDS=0
   if [ -z "$SNAPSHOT" ]; then
-    SNAPSHOT=$(oc get snapshots -l "pac.test.appstudio.openshift.io/event-type notin (pull_request),appstudio.openshift.io/application=$APPLICATION" --sort-by=.metadata.creationTimestamp | tail -1 | awk '{print $1}')
+    SNAPSHOT=$(oc get snapshots -l "pac.test.appstudio.openshift.io/event-type in (push,incoming),appstudio.openshift.io/application=$APPLICATION" --sort-by=.metadata.creationTimestamp | tail -1 | awk '{print $1}')
   fi
   echo "Snapshot: $SNAPSHOT (${SECONDS}s)"
 
@@ -141,10 +144,21 @@ else
 
   COMMAND="ec validate image --ignore-rekor true --workers $WORKERS --file-path $SNAPSHOT_FILE --public-key $PUBKEY --policy $POLICY_FILE --info --output yaml --timeout 30m0s $VERBOSE_FLAG"
 
+  HEADER="# ec command: $COMMAND
+# snapshot: $SNAPSHOT
+# excluded: $EXCLUDE"
+  if [ -n "$FILTER" ]; then
+    COMPONENT_NAMES=$(jq -r '.spec.components[].name' "$SNAPSHOT_FILE" | sort | sed 's/^/# - /')
+    HEADER="$HEADER
+# filter: $FILTER
+# components ($COMPONENT_COUNT):
+$COMPONENT_NAMES"
+  fi
+
   echo "=== Running EC validation ==="
   echo "$COMMAND"
   SECONDS=0
-  $COMMAND | tee $RESULTS_FILE
+  { echo "$HEADER"; $COMMAND; } | tee $RESULTS_FILE
   EC_EXIT=$?
   DURATION=$SECONDS
 
