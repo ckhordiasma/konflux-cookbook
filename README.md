@@ -1,6 +1,17 @@
 # konflux-cookbook
 
-A collection of guides and tools for getting builds working on Konflux.
+A collection of guides and tools for getting production-ready builds working on Konflux
+
+## Manifesto
+
+Give developers the local tools and knowledge to have confidence that their konflux builds will not have issues downstream.
+
+## Things that cause issues downstream
+
+- Hermetic Builds
+- Conforma
+- FIPS
+- Support for PowerPC and IBM Z (power/z)
 
 ## Structure
 
@@ -11,8 +22,9 @@ konflux-cookbook/
 └── .claude-plugin/   # Plugin manifest
 ```
 
-- **`guides/`** -- step-by-step guides you can follow manually. Each guide covers a specific build task.
-- **`skills/`** -- Claude Code plugin skills that automate the guides. These are used by Claude, not directly by humans.
+- **`guides/`** -- Step-by-step guides you can follow manually. 
+- **`skills/`** -- Claude Code plugin skills that reference the guides. Use the skills to have claude walk you through a guide.
+- `scripts/` -- Scripts that "one-shot" the guide, given you provide it with all the correct input parameters. In other words, a deterministic automation of a given guide.
 
 ## Guides
 
