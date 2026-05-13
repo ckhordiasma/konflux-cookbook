@@ -2,7 +2,7 @@
 
 ## What is Hermeto
 
-Hermeto is a CLI tool that pre-fetches project dependencies so that container builds can run without network access (hermetic builds). It downloads all declared dependencies from lockfiles into a local output directory, generates an SBOM, and produces environment files that configure package managers to use the local cache instead of reaching out to the internet. Hermeto is the renamed successor of Cachi2 -- the output directory and environment file still use the `/cachi2/` paths for backward compatibility.
+Hermeto is a CLI tool that pre-fetches project dependencies so that container builds can run without network access (hermetic builds). It downloads all declared dependencies from lockfiles into a local output directory, generates an SBOM, and produces environment files that configure package managers to use the local cache instead of reaching out to the internet. Hermeto is the renamed successor of Cachi2 -- the output directory and environment file in this guide (and in konflux) still use the `/cachi2/` paths for backward compatibility.
 
 ## Installing Hermeto
 
@@ -30,6 +30,7 @@ Hermeto supports the following package managers -- jump to the one(s) your proje
 | `yarn` | JavaScript | [yarn (JavaScript)](#yarn-javascript) |
 | `bundler` | Ruby | [bundler (Ruby)](#bundler-ruby) |
 | `rpm` | System packages | [rpm](#rpm) |
+| `generic` | Any (URLs, Maven) | [generic](#generic) |
 
 A typical multi-manager config:
 
@@ -60,7 +61,7 @@ hermeto fetch-deps \
   hermeto.json
 ```
 
-See [Building with Prefetched Dependencies](#building-with-prefetched-dependencies) for how to use the prefetched output in a hermetic build.
+Once `fetch-deps` is used to download the dependencies, some additional configuration is needed to actually get a local offline build working. See [Building with Prefetched Dependencies](#building-with-prefetched-dependencies) for how to properly use the prefetched output in a hermetic build.
 
 ### pip (Python)
 
@@ -68,7 +69,7 @@ See [Building with Prefetched Dependencies](#building-with-prefetched-dependenci
 
 Hermeto requires a fully resolved `requirements.txt` with all transitive dependencies pinned to exact versions (e.g., `package==1.2.3`). Hashes are optional but recommended for PyPI packages, and mandatory for HTTPS URL dependencies. If any of your dependencies are sdists (no pre-built wheel available), you also need a `requirements-build.txt` listing their PEP 517 build backends. See [Python Requirements](#python-requirements) for how to generate these files.
 
-Some packages lack wheels or sdists on PyPI for certain architectures -- this is common on ppc64le and s390x. See [Using AIPCC Wheels](#using-aipcc-wheels) for access to pre-built wheels, or [Building from Source for Missing Architectures](#building-from-source-for-missing-architectures) for building packages like torch from source tarballs.
+Some packages lack wheels or sdists on PyPI for certain architectures -- this is common on ppc64le and s390x. See [Using AIPCC Wheels](#using-aipcc-wheels) to review how to leverage pre-built wheels built by the AIPCC team, or [Building from Source for Missing Architectures](#building-from-source-for-missing-architectures) for how to build packages like torch from source tarballs.
 
 **Config fields:**
 
@@ -228,6 +229,87 @@ Prefetches system RPM packages. Requires an `rpms.lock.yaml` lockfile (see [RPM 
 ```json
 {"type": "rpm", "path": "."}
 ```
+
+### generic
+
+[Hermeto generic docs](https://hermetoproject.github.io/hermeto/latest/generic/)
+
+Downloads arbitrary files or Maven artifacts by URL. Use this for dependencies that don't fit any other package manager -- for example, files fetched with `curl` or `wget` in the Dockerfile. Avoid using it for anything already supported by a dedicated hermeto package manager, since the SBOM entries it produces are less accurate.
+
+Dependencies are declared in an `artifacts.lock.yaml` lockfile rather than in `hermeto.json` options:
+
+```yaml
+metadata:
+  version: "1.0"
+artifacts:
+  # Arbitrary file download
+  - download_url: "https://example.com/some-tool-v1.2.tar.gz"
+    filename: "some-tool.tar.gz"
+    checksum: "sha256:abc123..."
+
+  # Maven artifact
+  - type: "maven"
+    filename: "ant.jar"
+    attributes:
+      repository_url: "https://repo1.maven.org/maven2"
+      group_id: "org.apache.ant"
+      artifact_id: "ant"
+      version: "1.10.14"
+      type: "jar"
+    checksum: "sha256:4cbbd9243de4c1042d61d9a15db4c43c90ff93b16d78b39481da1c956c8e9671"
+```
+
+Each artifact requires a `checksum` in `algorithm:hash` format. Downloaded files are stored in `deps/generic/` within the output directory.
+
+**Config fields:**
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `path` | `"."` | Directory containing the lockfile, relative to `--source` |
+| `lockfile` | `"artifacts.lock.yaml"` | Path to the artifacts lockfile |
+
+**Example:**
+
+```json
+{"type": "generic", "path": "."}
+```
+
+## Recommended Workflow
+
+### Create a Dockerfile.konflux
+
+Start by copying your existing Dockerfile to `Dockerfile.konflux`. This is the copy you will modify for hermetic builds -- keep the original Dockerfile untouched so the project's existing non-hermetic build continues to work.
+
+```bash
+cp Dockerfile Dockerfile.konflux
+```
+
+All subsequent changes in this guide (sourcing the hermeto env file, adding system packages to support hermetic installs, etc.) should be made in `Dockerfile.konflux`.
+
+### Start from the Dockerfile
+
+The Dockerfile is the source of truth for what the build needs. Before writing any hermeto config, read through the Dockerfile (and any scripts it COPYs and RUNs) and identify every point where the build pulls something from the network:
+
+- **Package manager installs** -- pip, cargo, npm, go, yarn, bundler
+- **System package installs** -- microdnf, dnf, yum
+- **Direct downloads** -- curl, wget, git clone, or any script that fetches from the internet. These can often be handled with the [generic fetcher](#generic).
+
+Each network access point maps to a hermeto package manager config (see [Configuring hermeto.json](#configuring-hermetojson)) or needs a manual workaround.
+
+If the project has multiple Dockerfiles, identify which one is the target for hermetic builds. Also check whether the Dockerfile requires additional build inputs (argfiles, build-args, `.env` files) that affect what gets installed.
+
+### Iterate one package manager at a time
+
+Getting a hermetic build working is an iterative process. The core loop for each package manager is:
+
+1. Add the manager to `hermeto.json` -- start with the simplest valid config (just `type` and `path`), then add options as needed (e.g., `binary` for wheels, `requirements_build_files` for sdists)
+2. Run `hermeto fetch-deps` -- expect this to fail at first while you refine the config
+3. Fix issues (missing lockfiles, wrong options, version mismatches) and re-run until fetch-deps succeeds
+4. Run a build to verify the prefetched deps actually work
+
+You can work through package managers one at a time rather than configuring everything upfront. This works because some managers (like pip) use the prefetched cache automatically once the hermeto env vars are injected into the Dockerfile -- so you can run `podman build --network none` to verify that *the current manager* is fully hermetic while other managers (like RPMs) still use the network. Once one manager is confirmed hermetic, move on to the next.
+
+Alternatively, you can configure all managers in `hermeto.json` first, get `fetch-deps` passing for everything, and then do a single full hermetic build at the end. Choose whichever approach suits the complexity of your project.
 
 ## Building with Prefetched Dependencies
 
@@ -624,6 +706,25 @@ This produces `rpms.lock.yaml` with exact URLs and checksums for every RPM (incl
 ### Using RPM prefetch in your Dockerfile
 
 No changes needed in the Dockerfile itself. The Konflux build pipeline handles RPM prefetch automatically when it finds `rpms.lock.yaml`. The RPMs are made available through the same `/cachi2/` mount, and `microdnf install` works because the env file configures the local RPM repo.
+
+## What to Commit
+
+Once your hermetic build is working:
+
+**Commit these files:**
+- Compiled/pinned requirements files (`requirements.txt`, `requirements-build.txt`, etc.)
+- `rpms.in.yaml` and `rpms.lock.yaml` (if using RPM prefetch)
+
+**Do not commit:**
+- `hermeto.json` -- for local testing only. The config is inlined in the Tekton PipelineRun prefetch task parameter.
+- `.hermeto/` -- the prefetched output directory
+- `.hermeto.env` -- the generated environment file
+
+**Consider automating lockfile regeneration:**
+- Lockfiles like `requirements.txt`, `requirements-build.txt`, and `rpms.lock.yaml` need to be regenerated when dependencies change. Consider adding a Makefile target, script, or CI job to automate this so the committed lockfiles stay in sync with your project's dependency declarations.
+
+**Update in Tekton:**
+- Copy the contents of `hermeto.json` into the prefetch task parameter in your `.tekton/` PipelineRun
 
 ## Common Gotchas
 
