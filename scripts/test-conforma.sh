@@ -15,6 +15,7 @@ Options:
   -s, --snapshot NAME     Snapshot name (default: latest push snapshot).
                           If used without -a, the application is derived from the snapshot.
   -r, --latest-rc    Use the latest released snapshot (requires -a)
+  -t, --effective-time DATE  Evaluate policies as of this date (YYYY-MM-DD, default: now)
   -p, --policy FILE       Policy file or k8s ref (default: registry-rhoai-prod.yaml)
   -o, --output FILE       Results output file (default: ec-report-APP-POLICY.yaml)
   -w, --workers N         Concurrent workers (default: 50)
@@ -25,7 +26,7 @@ Options:
 One of -a/--application, -s/--snapshot, or -i/--image is required.
 
 All options can also be set via environment variables:
-  APPLICATION, IMAGE, FILTER, EXCLUDE, SNAPSHOT, LATEST_RC, POLICY_FILE, RESULTS_FILE, WORKERS, PUBKEY, VERBOSE
+  APPLICATION, IMAGE, FILTER, EXCLUDE, SNAPSHOT, LATEST_RC, EFFECTIVE_TIME, POLICY_FILE, RESULTS_FILE, WORKERS, PUBKEY, VERBOSE
 EOF
 }
 
@@ -37,6 +38,7 @@ while [ $# -gt 0 ]; do
     -x|--exclude)     EXCLUDE="$2"; shift 2 ;;
     -s|--snapshot)    SNAPSHOT="$2"; shift 2 ;;
     -r|--latest-rc) LATEST_RC=true; shift ;;
+    -t|--effective-time) EFFECTIVE_TIME="$2"; shift 2 ;;
     -p|--policy)      POLICY_FILE="$2"; shift 2 ;;
     -o|--output)      RESULTS_FILE="$2"; shift 2 ;;
     -w|--workers)     WORKERS="$2"; shift 2 ;;
@@ -92,14 +94,22 @@ if [ "$VERBOSE" = "true" ]; then
   VERBOSE_FLAG="--verbose"
 fi
 
+EFFECTIVE_TIME_FLAG=""
+TIME_SUFFIX=""
+if [ -n "$EFFECTIVE_TIME" ]; then
+  EFFECTIVE_TIME_FLAG="--effective-time ${EFFECTIVE_TIME}T00:00:00Z"
+  TIME_SUFFIX="-${EFFECTIVE_TIME}"
+  echo "Effective time: ${EFFECTIVE_TIME}"
+fi
+
 if [ -n "$IMAGE" ]; then
   # Single image mode
   IMAGE_SHORT=${IMAGE##*/}
   IMAGE_SHORT=${IMAGE_SHORT%%@*}
   IMAGE_SHORT=${IMAGE_SHORT%%:*}
-  RESULTS_FILE=${RESULTS_FILE:-ec-report-${IMAGE_SHORT}-${POLICY_STEM}.yaml}
+  RESULTS_FILE=${RESULTS_FILE:-ec-report-${IMAGE_SHORT}-${POLICY_STEM}${TIME_SUFFIX}.yaml}
 
-  COMMAND="ec validate image --ignore-rekor true --image $IMAGE --public-key $PUBKEY --policy $POLICY_FILE --info --output yaml --timeout 30m0s $VERBOSE_FLAG"
+  COMMAND="ec validate image --ignore-rekor true --image $IMAGE --public-key $PUBKEY --policy $POLICY_FILE --info --output yaml --timeout 30m0s $EFFECTIVE_TIME_FLAG $VERBOSE_FLAG"
 
   HEADER="# ec command: $COMMAND
 # image: $IMAGE"
@@ -174,9 +184,9 @@ else
   if [ -n "$FILTER" ]; then
     FILTER_SUFFIX="-filtered"
   fi
-  RESULTS_FILE=${RESULTS_FILE:-ec-report-${APPLICATION}-${POLICY_STEM}${FILTER_SUFFIX}.yaml}
+  RESULTS_FILE=${RESULTS_FILE:-ec-report-${APPLICATION}-${POLICY_STEM}${FILTER_SUFFIX}${TIME_SUFFIX}.yaml}
 
-  COMMAND="ec validate image --ignore-rekor true --workers $WORKERS --file-path $SNAPSHOT_FILE --public-key $PUBKEY --policy $POLICY_FILE --info --output yaml --timeout 30m0s $VERBOSE_FLAG"
+  COMMAND="ec validate image --ignore-rekor true --workers $WORKERS --file-path $SNAPSHOT_FILE --public-key $PUBKEY --policy $POLICY_FILE --info --output yaml --timeout 30m0s $EFFECTIVE_TIME_FLAG $VERBOSE_FLAG"
 
   HEADER="# ec command: $COMMAND
 # snapshot: $SNAPSHOT
