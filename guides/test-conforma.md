@@ -63,7 +63,7 @@ APPLICATION=rhoai-v3-4
 
 ### 2. Find the latest snapshot
 
-Snapshots are created by Konflux after successful builds or component changes. To find the most recent snapshot for your application:
+Snapshots are created by Konflux after successful builds or component changes. To find the most recent push snapshot for your application:
 
 ```bash
 oc get snapshots \
@@ -80,6 +80,29 @@ SNAPSHOT=<name-from-output>
 The label selectors filter for:
 - `pac.test.appstudio.openshift.io/event-type notin (pull_request)` -- excludes pull request snapshots while including push snapshots and snapshots created without an event-type label (e.g. component removals)
 - `appstudio.openshift.io/application=$APPLICATION` -- only snapshots for your application
+
+#### Alternative: use the latest released snapshot
+
+To validate against the snapshot from the most recent release instead of the latest push snapshot, find it via the Release CR:
+
+```bash
+SNAPSHOT=$(oc get releases \
+  -l "appstudio.openshift.io/application=$APPLICATION" \
+  --sort-by=.metadata.creationTimestamp \
+  -o jsonpath='{.items[-1:].spec.snapshot}')
+```
+
+The `test-conforma.sh` script supports this directly with `--latest-rc`:
+
+```bash
+./scripts/test-conforma.sh --application rhoai-v3-4 --latest-rc
+```
+
+You can also specify a snapshot directly without an application — the script will derive the application name from the snapshot:
+
+```bash
+./scripts/test-conforma.sh --snapshot <snapshot-name>
+```
 
 ### 3. Download and filter the snapshot
 

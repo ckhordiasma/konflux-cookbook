@@ -2,7 +2,7 @@
 
 usage() {
   cat <<EOF
-Usage: test-conforma.sh (-a <app> | -i <image>) [options]
+Usage: test-conforma.sh (-a <app> | -s <snapshot> | -i <image>) [options]
 
 Run EC validation against a Konflux snapshot or a single container image.
 
@@ -12,7 +12,9 @@ Options:
   -f, --filter REGEX      Regex filter on component names (snapshot mode only)
   -x, --exclude PATTERNS  Comma-separated partial names to exclude (snapshot mode only)
                           (default: fbc-fragment,rhai-on-openshift-chart,rhoai-on-xks-chart)
-  -s, --snapshot NAME     Snapshot name (default: latest push snapshot)
+  -s, --snapshot NAME     Snapshot name (default: latest push snapshot).
+                          If used without -a, the application is derived from the snapshot.
+  -r, --latest-rc    Use the latest released snapshot (requires -a)
   -p, --policy FILE       Policy file or k8s ref (default: registry-rhoai-prod.yaml)
   -o, --output FILE       Results output file (default: ec-report-APP-POLICY.yaml)
   -w, --workers N         Concurrent workers (default: 50)
@@ -20,10 +22,10 @@ Options:
   -v, --verbose           Enable verbose output
   -h, --help              Show this help
 
-Either -a/--application or -i/--image is required.
+One of -a/--application, -s/--snapshot, or -i/--image is required.
 
 All options can also be set via environment variables:
-  APPLICATION, IMAGE, FILTER, EXCLUDE, SNAPSHOT, POLICY_FILE, RESULTS_FILE, WORKERS, PUBKEY, VERBOSE
+  APPLICATION, IMAGE, FILTER, EXCLUDE, SNAPSHOT, LATEST_RC, POLICY_FILE, RESULTS_FILE, WORKERS, PUBKEY, VERBOSE
 EOF
 }
 
@@ -34,6 +36,7 @@ while [ $# -gt 0 ]; do
     -f|--filter)      FILTER="$2"; shift 2 ;;
     -x|--exclude)     EXCLUDE="$2"; shift 2 ;;
     -s|--snapshot)    SNAPSHOT="$2"; shift 2 ;;
+    -r|--latest-rc) LATEST_RC=true; shift ;;
     -p|--policy)      POLICY_FILE="$2"; shift 2 ;;
     -o|--output)      RESULTS_FILE="$2"; shift 2 ;;
     -w|--workers)     WORKERS="$2"; shift 2 ;;
@@ -44,14 +47,28 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-if [ -z "$APPLICATION" ] && [ -z "$IMAGE" ]; then
-  echo "ERROR: either APPLICATION (-a) or IMAGE (-i) is required"
+LATEST_RC=${LATEST_RC:-false}
+
+if [ -z "$APPLICATION" ] && [ -z "$IMAGE" ] && [ -z "$SNAPSHOT" ]; then
+  echo "ERROR: one of APPLICATION (-a), SNAPSHOT (-s), or IMAGE (-i) is required"
   echo ""
   usage
   exit 1
 fi
-if [ -n "$APPLICATION" ] && [ -n "$IMAGE" ]; then
-  echo "ERROR: specify either APPLICATION (-a) or IMAGE (-i), not both"
+if [ -n "$IMAGE" ] && { [ -n "$APPLICATION" ] || [ -n "$SNAPSHOT" ]; }; then
+  echo "ERROR: IMAGE (-i) cannot be combined with APPLICATION (-a) or SNAPSHOT (-s)"
+  echo ""
+  usage
+  exit 1
+fi
+if [ "$LATEST_RC" = "true" ] && [ -z "$APPLICATION" ]; then
+  echo "ERROR: --latest-rc requires APPLICATION (-a)"
+  echo ""
+  usage
+  exit 1
+fi
+if [ "$LATEST_RC" = "true" ] && [ -n "$SNAPSHOT" ]; then
+  echo "ERROR: --latest-rc and --snapshot are mutually exclusive"
   echo ""
   usage
   exit 1
@@ -102,18 +119,26 @@ if [ -n "$IMAGE" ]; then
   echo "Exit code:  $EC_EXIT"
 else
   # Snapshot mode
-  FILTER_SUFFIX=""
-  if [ -n "$FILTER" ]; then
-    FILTER_SUFFIX="-filtered"
-  fi
-  RESULTS_FILE=${RESULTS_FILE:-ec-report-${APPLICATION}-${POLICY_STEM}${FILTER_SUFFIX}.yaml}
-
   echo "=== Fetching snapshot ==="
   SECONDS=0
-  if [ -z "$SNAPSHOT" ]; then
+  if [ "$LATEST_RC" = "true" ]; then
+    # Find the latest successful release via Release CRs
+    LATEST_RC_JSON=$(oc get releases -l "appstudio.openshift.io/application=$APPLICATION" --sort-by=.metadata.creationTimestamp -o json \
+      | jq -r '[.items[] | select(.status.conditions[]? | .type == "Released" and .reason == "Succeeded")] | last | "\(.metadata.name)\t\(.spec.snapshot)"')
+    RELEASE_NAME=$(echo "$LATEST_RC_JSON" | cut -f1)
+    SNAPSHOT=$(echo "$LATEST_RC_JSON" | cut -f2)
+    if [ -z "$SNAPSHOT" ] || [ "$SNAPSHOT" = "null" ]; then
+      echo "ERROR: no successful releases found for application '$APPLICATION'"
+      exit 1
+    fi
+    echo "Release: $RELEASE_NAME"
+    echo "Latest release snapshot: $SNAPSHOT (${SECONDS}s)"
+  elif [ -z "$SNAPSHOT" ]; then
     SNAPSHOT=$(oc get snapshots -l "pac.test.appstudio.openshift.io/event-type in (push,incoming),appstudio.openshift.io/application=$APPLICATION" --sort-by=.metadata.creationTimestamp | tail -1 | awk '{print $1}')
+    echo "Snapshot: $SNAPSHOT (${SECONDS}s)"
+  else
+    echo "Snapshot: $SNAPSHOT (${SECONDS}s)"
   fi
-  echo "Snapshot: $SNAPSHOT (${SECONDS}s)"
 
   WORK_DIR=$(mktemp -d)
   echo "Work dir: $WORK_DIR"
@@ -137,10 +162,19 @@ else
   fi
 
   SNAPSHOT_APP=$(jq -r '.spec.application' "$SNAPSHOT_FILE")
-  if [ "$SNAPSHOT_APP" != "$APPLICATION" ]; then
+  if [ -z "$APPLICATION" ]; then
+    APPLICATION=$SNAPSHOT_APP
+    echo "Application (from snapshot): $APPLICATION"
+  elif [ "$SNAPSHOT_APP" != "$APPLICATION" ]; then
     echo "ERROR: Snapshot application '$SNAPSHOT_APP' does not match APPLICATION='$APPLICATION'"
     exit 1
   fi
+
+  FILTER_SUFFIX=""
+  if [ -n "$FILTER" ]; then
+    FILTER_SUFFIX="-filtered"
+  fi
+  RESULTS_FILE=${RESULTS_FILE:-ec-report-${APPLICATION}-${POLICY_STEM}${FILTER_SUFFIX}.yaml}
 
   COMMAND="ec validate image --ignore-rekor true --workers $WORKERS --file-path $SNAPSHOT_FILE --public-key $PUBKEY --policy $POLICY_FILE --info --output yaml --timeout 30m0s $VERBOSE_FLAG"
 
