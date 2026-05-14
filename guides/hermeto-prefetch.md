@@ -108,6 +108,8 @@ By default, hermeto fetches only source distributions (sdists). Add a `binary` o
 
 The key fields are `packages` (comma-separated names, or `:all:` to try wheels for everything), `arch` (comma-separated architectures, default `"x86_64"`), and `os` (default `"linux"`). When `packages` is `:all:` (the default), hermeto prefers wheels but falls back to sdists. When you name specific packages, hermeto *fails* if no matching wheel exists. See the [hermeto pip docs](https://hermetoproject.github.io/hermeto/latest/pip/) for additional filter fields (`py_version`, `py_impl`, `abi`, `platform`).
 
+An empty `"binary": {}` is valid and uses all defaults (`packages: ":all:"`, `arch: "x86_64"`). This is the simplest way to enable wheel fetching, but it only fetches x86_64 wheels. To fetch wheels for all your target architectures, list them explicitly in `arch`.
+
 `requirements_build_files` is needed if any of your dependencies are installed from source distributions (sdists) -- the build file provides the build backends (hatchling, maturin, etc.) needed to compile them.
 
 If a package has no wheel for your target architecture on PyPI (common on ppc64le/s390x), you have two options:
@@ -328,7 +330,9 @@ The Dockerfile is the source of truth for what the build needs. Before writing a
 
 - **Package manager installs** -- pip, cargo, npm, go, yarn, bundler
 - **System package installs** -- microdnf, dnf, yum
-- **Direct downloads** -- curl, wget, git clone, or any script that fetches from the internet. These can often be handled with the [generic fetcher](#generic).
+- **Direct downloads** -- curl, wget, git clone, or any script that fetches from the internet. These can often be handled with the [generic fetcher](#generic). Alternatively, you can eliminate the download entirely: copy the binary from an existing, trusted container image via a multi-stage `COPY --from=` (e.g., kubectl from `ose-cli-rhel9`), or choose a base image that already includes the tools you need. You can also add the tool's source as a git submodule and build it from source with its own prefetch entry, though this adds complexity — you are now building two things hermetically instead of one.
+
+> **Red Hat note:** Generic fetcher entries require a policy exception for productized builds. Prefer the alternatives above (multi-stage copy, base image selection, building from source) when possible.
 
 Each network access point maps to a hermeto package manager config (see [Configuring hermeto.json](#configuring-hermetojson)) or needs a manual workaround.
 
@@ -336,7 +340,9 @@ Only network access in the Dockerfile matters. A repo may contain lockfiles (e.g
 
 Multiple commands using the same package manager still map to a single hermeto entry. For example, a Dockerfile might run `npm ci` for a full install during the build stage and then `npm install --omit=dev` to prune to production dependencies. Both draw from the same prefetched cache -- hermeto prefetches everything in the lockfile, and each `npm` command finds what it needs regardless of flags like `--omit=dev` or `--ignore-scripts`.
 
-If the project has multiple Dockerfiles, identify which one is the target for hermetic builds. Also check whether the Dockerfile requires additional build inputs (argfiles, build-args, `.env` files) that affect what gets installed.
+If the project has multiple Dockerfiles, identify which one is the target for hermetic builds. Also check whether the Dockerfile requires additional build inputs (argfiles, build-args, `.env` files) that affect what gets installed.[^no-deps]
+
+[^no-deps]: If your analysis finds zero network access points, you don't need hermeto at all. Set `hermetic: true` in your pipeline without `prefetch-input` — the build succeeds with nothing to prefetch. This is common for data-only containers that just COPY static files into the image.
 
 ### Iterate one package manager at a time
 

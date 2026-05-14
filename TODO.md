@@ -63,10 +63,10 @@ in the guide. Source: `konflux-central` branch `rhoai-3.5-ea.1` pipelineruns.
 - [x] [mlserver](https://github.com/red-hat-data-services/mlserver) — pip/AIPCC only, zero hermetic Dockerfile changes, installs by package name not `-r requirements.txt`
 - [x] [model-metadata-collection](https://github.com/red-hat-data-services/model-metadata-collection) — gomod only, zero hermetic Dockerfile changes, data-only container (no `go build` in Dockerfile), prefetch likely for SBOM/provenance only
 - [x] [model-registry-operator](https://github.com/red-hat-data-services/model-registry-operator) — gomod only, zero hermetic Dockerfile changes, FIPS build flags (`strictfipsruntime`)
-- [ ] [models-perf-benchmark-data](https://github.com/red-hat-data-services/models-perf-benchmark-data)
-- [ ] [must-gather](https://github.com/red-hat-data-services/must-gather)
-- [ ] [odh-cli](https://github.com/red-hat-data-services/odh-cli)
-- [ ] [ogx-k8s-operator](https://github.com/red-hat-data-services/ogx-k8s-operator)
+- [x] [models-perf-benchmark-data](https://github.com/red-hat-data-services/models-perf-benchmark-data) — no prefetch, zero hermetic Dockerfile changes, data-only container (COPYs JSON files), `hermetic: true` without `prefetch-input`
+- [x] [must-gather](https://github.com/red-hat-data-services/must-gather) — no prefetch, zero hermetic Dockerfile changes, `hermetic: true` without `prefetch-input`, network access eliminated via multi-stage `COPY --from=` (kubectl) and Git LFS (helm)
+- [x] [odh-cli](https://github.com/red-hat-data-services/odh-cli) — gomod (2 entries: root + yq submodule) + pip + RPMs, zero hermetic Dockerfile changes, git submodule replaces curl for yq, `ose-cli-rhel9` base eliminates kubectl/oc download
+- [x] [ogx-k8s-operator](https://github.com/red-hat-data-services/ogx-k8s-operator) — gomod only, zero hermetic Dockerfile changes, two components (ogx-k8s-operator + llama-stack-k8s-operator) sharing same Dockerfile.konflux
 - [ ] [rhods-operator](https://github.com/red-hat-data-services/rhods-operator)
 - [x] [spark-operator](https://github.com/red-hat-data-services/spark-operator) — gomod + pip/AIPCC + RPMs, EPEL for tini, installs by package name not `-r requirements.txt`
 - [ ] [trainer](https://github.com/red-hat-data-services/trainer)
@@ -109,6 +109,10 @@ in the guide. Source: `konflux-central` branch `rhoai-3.5-ea.1` pipelineruns.
   - Dockerfile placement when build context is a subdirectory — place Dockerfile.konflux at repo root, use `path-context` + relative `dockerfile` in pipeline (see [kserve-autogluon-server](https://github.com/red-hat-data-services/kserve-autogluon-server/blob/rhoai-3.5-ea.1/Dockerfile.konflux.autogluon) with `path-context: python` and `dockerfile: ../Dockerfile.konflux.autogluon`)
   - Component-suffix naming for multi-component repos (`Dockerfile.konflux.autogluon`, `Dockerfile.konflux.huggingface`, etc.)
   - `--no-build-isolation` for `pip install .` of local packages — commonly used in hermetic builds as a defensive practice, though not strictly required when build backends are in the prefetched cache (see [kserve-autogluon-server Dockerfile.konflux.autogluon](https://github.com/red-hat-data-services/kserve-autogluon-server/blob/rhoai-3.5-ea.1/Dockerfile.konflux.autogluon))
+  - `ubi9-micro` vs `ubi9-minimal` — `ubi9-micro` lacks a shell, which breaks the pipeline's `RUN` injection of `. /cachi2/cachi2.env &&`. Use `ubi9-minimal` if your Dockerfile has any `RUN` instructions (see [models-perf-benchmark-data](https://github.com/red-hat-data-services/models-perf-benchmark-data/blob/rhoai-3.5-ea.1/Dockerfile.konflux))
+  - FIPS compliance for Go builds — `GOEXPERIMENT=strictfipsruntime`, `-tags strictfipsruntime`, `CGO_ENABLED=1` (see [ogx-k8s-operator upstream Dockerfile](https://github.com/red-hat-data-services/ogx-k8s-operator/blob/rhoai-3.5-ea.1/Dockerfile) for the full pattern, and [odh-cli yq-builder stage](https://github.com/red-hat-data-services/odh-cli/blob/rhoai-3.5-ea.1/Dockerfile.konflux) for applying it to submodule builds)
+  - Eliminating `curl`/`wget` downloads — multi-stage `COPY --from=` from trusted images (see [must-gather](https://github.com/red-hat-data-services/must-gather/blob/rhoai-3.5-ea.1/Dockerfile.konflux): kubectl from `ose-cli-rhel9`), or choosing a base image that already includes the tools (see [odh-cli](https://github.com/red-hat-data-services/odh-cli/blob/rhoai-3.5-ea.1/Dockerfile.konflux): `ose-cli-rhel9` base for kubectl/oc)
+  - Git submodule builds — adding a tool's source as a git submodule and building from source in a builder stage (see [odh-cli yq-builder](https://github.com/red-hat-data-services/odh-cli/blob/rhoai-3.5-ea.1/Dockerfile.konflux))
   - Other Konflux-general practices that aren't hermeto-specific
 - [ ] Renovate guide -- how Renovate auto-updates pinned base image digests in Dockerfiles, and how this interacts with build-arg patterns (currently Renovate scans `FROM` lines for digest pins, so switching to `ARG BASE_IMAGE=...@sha256:...` + `FROM ${BASE_IMAGE}` may require renovate config changes to keep automated updates working)
 
