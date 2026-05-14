@@ -92,16 +92,16 @@ SNAPSHOT=$(oc get releases \
   -o jsonpath='{.items[-1:].spec.snapshot}')
 ```
 
-The `test-conforma.sh` script supports this directly with `--latest-rc`:
+The `conforma.sh` script supports this directly with `--latest-rc`:
 
 ```bash
-./scripts/test-conforma.sh --application rhoai-v3-4 --latest-rc
+./scripts/conforma.sh --application rhoai-v3-4 --latest-rc
 ```
 
 You can also specify a snapshot directly without an application — the script will derive the application name from the snapshot:
 
 ```bash
-./scripts/test-conforma.sh --snapshot <snapshot-name>
+./scripts/conforma.sh --snapshot <snapshot-name>
 ```
 
 ### 3. Download and filter the snapshot

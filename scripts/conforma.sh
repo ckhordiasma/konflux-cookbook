@@ -2,7 +2,7 @@
 
 usage() {
   cat <<EOF
-Usage: test-conforma.sh (-a <app> | -s <snapshot> | -i <image>) [options]
+Usage: conforma.sh (-a <app> | -s <snapshot> | -i <image>) [options]
 
 Run EC validation against a Konflux snapshot or a single container image.
 
