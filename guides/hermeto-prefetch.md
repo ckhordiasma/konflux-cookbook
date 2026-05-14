@@ -786,6 +786,10 @@ Once the AIPCC base image is in place, no additional hermeto-specific Dockerfile
 
 If your component builds for multiple accelerators (CPU, CUDA, ROCm), you may want to maintain separate requirements files per variant (e.g., `requirements.cpu.txt`, `requirements.cuda.txt`) and use build-args to select the right one at build time. The notebooks component does this with a `build-args/konflux.{variant}.conf` file that sets the index URL and base image for each variant (e.g., [CPU config](https://github.com/red-hat-data-services/notebooks/blob/1e60d9cb49ec28740e89ac8ce5ded897f86f775b/jupyter/datascience/ubi9-python-3.12/build-args/konflux.cpu.conf), [CUDA config](https://github.com/red-hat-data-services/notebooks/blob/1e60d9cb49ec28740e89ac8ce5ded897f86f775b/jupyter/pytorch/ubi9-python-3.12/build-args/konflux.cuda.conf)).
 
+**Transitional builds (`hermetic: false` with `prefetch-input`):**
+
+You can configure `prefetch-input` in your pipeline while keeping `hermetic: false`. This prefetches dependencies for caching and reproducibility without cutting off network access — the build still succeeds even if some dependencies are not yet prefetched. This is useful when onboarding a component incrementally: get prefetch working first, validate that the prefetched cache covers everything, then flip `hermetic: true`. The notebooks repo uses this pattern for 17 of 18 components while AIPCC onboarding is in progress.
+
 ### Building from source for missing architectures
 
 Some packages (like torch) have no wheels or sdists on PyPI for ppc64le/s390x but do publish source tarballs on their GitHub releases. You can prefetch these source tarballs through `requirements_build_files` so that pip can build from source on architectures that lack wheels, while still using PyPI wheels on x86_64/aarch64.
