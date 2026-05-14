@@ -740,6 +740,8 @@ The full index URL prefix is `https://console.redhat.com/api/pypi/public-rhai/`.
 
 If a package you need is missing from the AIPCC index, submit a request through the [AIPCC package request form](https://dashboard.aipcc.redhat.com/package-request) (requires Red Hat VPN). See the [package onboarding docs](https://package-onboarding-0af11e.gitlab.io/) for the full process.
 
+You need to request your project's **dependencies**, not the project itself. If your Dockerfile does `pip install .` to build the project from source, the project's code is installed locally — only its dependencies need to be on the AIPCC index. If your project has an upstream PyPI equivalent (e.g., `mlflow`), you can submit the upstream package name to get its full dependency tree onboarded, even if you don't use the AIPCC-built wheel yourself. If your midstream fork has different dependencies than upstream, request the missing packages individually.
+
 Key points:
 - **One submission per PyPI package** — sub-packages with separate PyPI entries need separate requests
 - **Transitive dependencies are handled automatically** — only request top-level packages
