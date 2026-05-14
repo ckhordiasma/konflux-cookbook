@@ -24,7 +24,7 @@ in the guide. Source: `konflux-central` branch `rhoai-3.5-ea.1` pipelineruns.
 #### Fully hermetic — single component
 
 - [x] [odh-dashboard](https://github.com/red-hat-data-services/odh-dashboard) — `odh-dashboard` component
-- [ ] [data-science-pipelines-operator](https://github.com/red-hat-data-services/data-science-pipelines-operator)
+- [x] [data-science-pipelines-operator](https://github.com/red-hat-data-services/data-science-pipelines-operator) — gomod only, zero hermetic Dockerfile changes
 - [ ] [eval-hub](https://github.com/red-hat-data-services/eval-hub)
 - [ ] [kserve-autogluon-server](https://github.com/red-hat-data-services/kserve-autogluon-server)
 - [ ] [kube-auth-proxy](https://github.com/red-hat-data-services/kube-auth-proxy)
@@ -72,7 +72,13 @@ in the guide. Source: `konflux-central` branch `rhoai-3.5-ea.1` pipelineruns.
 
 ## Dockerfile.konflux Best Practices
 
-- [ ] Guide on creating a Dockerfile.konflux from an upstream Dockerfile -- covers base image pinning by digest, build-arg simplification (hardcoding variant-specific values), label changes, and other Konflux-general practices that aren't hermeto-specific
+- [ ] Guide on creating a Dockerfile.konflux from an upstream Dockerfile
+  - Base image pinning by digest
+  - Build-arg simplification (hardcoding variant-specific values)
+  - Label changes
+  - Removing `--platform` from FROM (see [data-science-pipelines-operator Dockerfile.konflux](https://github.com/red-hat-data-services/data-science-pipelines-operator/blob/rhoai-3.5-ea.1/Dockerfile.konflux))
+  - FIPS build hardcoding — removing dev toggles like `FIPS_ENABLED` (see [data-science-pipelines-operator Dockerfile](https://github.com/red-hat-data-services/data-science-pipelines-operator/blob/rhoai-3.5-ea.1/Dockerfile) vs [Dockerfile.konflux](https://github.com/red-hat-data-services/data-science-pipelines-operator/blob/rhoai-3.5-ea.1/Dockerfile.konflux))
+  - Other Konflux-general practices that aren't hermeto-specific
 - [ ] Renovate guide -- how Renovate auto-updates pinned base image digests in Dockerfiles, and how this interacts with build-arg patterns (currently Renovate scans `FROM` lines for digest pins, so switching to `ARG BASE_IMAGE=...@sha256:...` + `FROM ${BASE_IMAGE}` may require renovate config changes to keep automated updates working)
 
 ## Conforma Compliance
