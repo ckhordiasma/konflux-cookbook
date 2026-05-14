@@ -38,9 +38,9 @@ in the guide. Source: `konflux-central` branch `rhoai-3.5-ea.1` pipelineruns.
 - [x] [kserve-autogluon-server](https://github.com/red-hat-data-services/kserve-autogluon-server) — pip/AIPCC only, zero hermetic Dockerfile changes, local path deps pattern
 - [x] [kube-auth-proxy](https://github.com/red-hat-data-services/kube-auth-proxy) — gomod only, zero hermetic Dockerfile changes, Go workspace (`go.work`) covers multi-module deps
 - [x] [kube-rbac-proxy](https://github.com/red-hat-data-services/kube-rbac-proxy) — gomod only, zero hermetic Dockerfile changes, `go mod vendor` + `-mod=vendor` pattern works with prefetched cache
-- [ ] [kuberay](https://github.com/red-hat-data-services/kuberay)
-- [ ] [llama-stack-provider-trustyai-garak](https://github.com/red-hat-data-services/llama-stack-provider-trustyai-garak)
-- [ ] [llm-d-kv-cache](https://github.com/red-hat-data-services/llm-d-kv-cache)
+- [x] [kuberay](https://github.com/red-hat-data-services/kuberay) — gomod only, zero hermetic Dockerfile changes, `path` matches `path-context` for subdirectory builds
+- [x] [llama-stack-provider-trustyai-garak](https://github.com/red-hat-data-services/llama-stack-provider-trustyai-garak) — pip/AIPCC + RPMs, zero hermetic Dockerfile changes, git dep migrated to AIPCC, permissive mode, CodeReady Builder repos
+- [x] [llm-d-kv-cache](https://github.com/red-hat-data-services/llm-d-kv-cache) — pip/AIPCC only, zero hermetic Dockerfile changes, `uv export` workflow, bad hash workaround
 - [ ] [mlflow-operator](https://github.com/red-hat-data-services/mlflow-operator)
 - [ ] [mlserver](https://github.com/red-hat-data-services/mlserver)
 - [ ] [model-metadata-collection](https://github.com/red-hat-data-services/model-metadata-collection)
