@@ -25,6 +25,18 @@
 - [ ] Document `-test` index variants (e.g., `cpu-ubi9-test/simple/`) that carry midstream/pre-release builds like `vllm==0.18.0+rhaiv.4` — found in llm-d-kv-cache and llama-stack-provider repos
 - [ ] Clarify the two URL prefixes (`console.redhat.com` vs `packages.redhat.com`) — both work, repos use them interchangeably
 
+#### Repos currently leveraging AIPCC wheels (rhoai-3.5-ea.1)
+
+- [distributed-workloads](https://github.com/red-hat-data-services/distributed-workloads) — CPU/CUDA/ROCm training images (th06-cpu, th06-cuda, th06-rocm)
+- [kserve-autogluon-server](https://github.com/red-hat-data-services/kserve-autogluon-server) — CPU index for autogluon serving
+- [llama-stack-provider-trustyai-garak](https://github.com/red-hat-data-services/llama-stack-provider-trustyai-garak) — CPU base image + AIPCC index
+- [llm-d-kv-cache](https://github.com/red-hat-data-services/llm-d-kv-cache) — CPU base image + AIPCC index (uds_tokenizer service)
+- [mlflow](https://github.com/red-hat-data-services/mlflow) — mixed AIPCC + PyPI requirements
+- [mlserver](https://github.com/red-hat-data-services/mlserver) — CPU requirements
+- [notebooks](https://github.com/red-hat-data-services/notebooks) — CPU/CUDA/ROCm base images and workbenches
+- [pipelines-components](https://github.com/red-hat-data-services/pipelines-components) — automl + autorag components
+- [spark-operator](https://github.com/red-hat-data-services/spark-operator) — CPU index for Spark dependencies
+
 ### Refine Hermeto Guide Against Real Repos
 
 Run `/refine-guide-hermeto` against repos with working hermetic builds to find gaps
