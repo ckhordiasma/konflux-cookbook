@@ -374,7 +374,7 @@ podman build . \
 
 ## Testing on Remote Architectures
 
-Konflux builds run on x86_64, aarch64, ppc64le, and s390x. Your local machine is only one of these, so to validate your hermetic build on other architectures you can run config and prefetch locally, then sync to a remote host for just the podman build. Hermeto downloads dependencies for all architectures declared in your config, so prefetch doesn't need to run on the target host. Ideally, `podman` is the only dependency needed on the remote host.
+Konflux builds run on x86_64, aarch64, ppc64le, and s390x. Your local machine is only one of these, so to validate your hermetic build on other architectures you can run config and prefetch locally, then sync to a remote host for just the podman build. Hermeto downloads dependencies for all architectures declared in your config, so prefetch doesn't need to run on the target host. Ideally, `podman` is the only dependency needed on the remote host. See the [Beaker VM provisioning guide](beaker-vm.md) for how to get a machine on a different architecture.
 
 Before syncing, make sure the following have been generated locally (see [Building with Prefetched Dependencies](#building-with-prefetched-dependencies)):
 
@@ -389,8 +389,13 @@ Sync the project to the remote host:
 rsync -az --delete \
   --exclude '__pycache__' \
   --exclude '*.pyc' \
+  --exclude 'node_modules' \
+  --exclude 'target' \
+  --exclude '.bundle' \
   . user@remote-host:/tmp/myproject
 ```
+
+Exclude local build artifacts and dependency caches that aren't needed on the remote host -- the hermetic build uses prefetched dependencies from `.hermeto/` instead. Remove any `--exclude` lines that don't apply to your project. Do NOT exclude `.hermeto/` -- it contains the prefetched output the build needs.
 
 Then SSH in and run the `podman build` from [step 4](#4-test-locally-with-a-hermetic-build). The remote host only needs `podman` -- it doesn't need hermeto, uv, or any other tooling.
 
@@ -408,6 +413,9 @@ ssh "$HOST" 'sudo dnf install -y rsync podman'
 rsync -az --delete \
   --exclude '__pycache__' \
   --exclude '*.pyc' \
+  --exclude 'node_modules' \
+  --exclude 'target' \
+  --exclude '.bundle' \
   . "$HOST:$REMOTE_DIR"
 
 # Drop into a shell on the remote host to run the build

@@ -32,7 +32,7 @@ konflux-cookbook/
 |-------|-------------|
 | [create-pr-pipeline](guides/create-pr-pipeline.md) | Create a temporary pull request PipelineRun from a push PipelineRun to test build changes on an RHOAI release branch |
 | [test-conforma](guides/test-conforma.md) | Run Conforma (Enterprise Contract) validation against a single image or Konflux snapshot to check release policy compliance |
-| [beaker-vm](guides/beaker-vm.md) | Provision a VM on Beaker for multi-arch build testing (ppc64le, s390x) |
+| [beaker-vm](guides/beaker-vm.md) | Provision a VM on Beaker for multi-arch build testing |
 
 ## Using as a Claude Code plugin
 

@@ -1,5 +1,7 @@
 # Provisioning a VM on Beaker for Multi-Arch Testing
 
+> **Note:** These instructions were written for the internal Red Hat Beaker system and require Red Hat Kerberos credentials and VPN access.
+
 ## What is Beaker
 
 [Beaker](https://beaker.engineering.redhat.com/) is Red Hat's hardware provisioning system. It lets you reserve physical and virtual machines across architectures (x86_64, aarch64, ppc64le, s390x) for testing. This is useful when you need to validate builds on architectures you don't have locally -- especially ppc64le and s390x, which are difficult to obtain otherwise.
@@ -34,6 +36,153 @@ Once you have a machine provisioned, you can use it as a remote build host for h
 5. Click **Submit job** and wait for your recipe to finish provisioning.
 
 6. Once provisioned, SSH into the machine as root. The default root password is shown in your [Beaker preferences](https://beaker.engineering.redhat.com/prefs/#root-password). You can also configure your SSH key in preferences for future reservations.
+
+## Automating with the `bkr` CLI
+
+The `bkr` command-line client can automate everything above. It uses Kerberos for authentication -- if you have a valid ticket from `kinit`, it works automatically.
+
+### Setup
+
+**On Fedora/RHEL:**
+
+```bash
+sudo dnf install -y beaker-client
+```
+
+**On macOS:**
+
+The `beaker-client` package is on [PyPI](https://pypi.org/project/beaker-client/) but is only officially supported on Linux. Use `uv run` to run it with no permanent install. It requires `setuptools<70` (for `pkg_resources`) and `pip-system-certs` (so Python trusts the Red Hat internal CA from your macOS Keychain):
+
+```bash
+uv run --with 'beaker-client' --with 'setuptools<70' --with 'pip-system-certs' -- bkr whoami
+```
+
+To avoid typing that every time, add a shell alias:
+
+```bash
+alias bkr='uv run --with beaker-client --with "setuptools<70" --with pip-system-certs -- bkr'
+```
+
+> **Note:** Running `bkr` in a podman container on macOS doesn't work well because macOS stores Kerberos tickets in its native Keychain API rather than a file, so they can't be mounted into the container. The `uv run` approach uses macOS Kerberos natively.
+
+**Configure the client:**
+
+Create `~/.beaker_client/config` pointing at the Red Hat Beaker instance with Kerberos auth:
+
+```bash
+mkdir -p ~/.beaker_client
+cat > ~/.beaker_client/config <<'EOF'
+HUB_URL = "https://beaker.engineering.redhat.com"
+AUTH_METHOD = "krbv"
+EOF
+```
+
+**Verify access:**
+
+```bash
+kinit your-username@REDHAT.COM
+bkr whoami
+```
+
+### Add your SSH key
+
+Beaker installs SSH keys from your user preferences into every system you provision. Upload your public key so you can SSH in without the default root password:
+
+```bash
+# Your Kerberos username (confirm with the .username field from `bkr whoami`)
+BEAKER_USER=your-username
+SSH_KEY=$HOME/.ssh/id_ed25519.pub
+
+# Authenticate and upload (Beaker requires a login step to get a session cookie)
+curl --negotiate -u : -c /tmp/beaker-cookies -b /tmp/beaker-cookies \
+  -X POST https://beaker.engineering.redhat.com/login/
+
+curl -b /tmp/beaker-cookies -X POST \
+  -H "Content-Type: text/plain" \
+  --data-binary @$SSH_KEY \
+  https://beaker.engineering.redhat.com/users/$BEAKER_USER/ssh-public-keys/
+```
+
+You can also do this through the [Beaker preferences](https://beaker.engineering.redhat.com/prefs/) web UI.
+
+### Provision a machine
+
+Use `bkr workflow-simple` to build a reservation. Start with `--dry-run --pretty-xml` to preview the job XML without submitting:
+
+```bash
+bkr workflow-simple \
+  --arch ppc64le \
+  --family RedHatEnterpriseLinux9 \
+  --variant BaseOS \
+  --task /distribution/check-install \
+  --reserve \
+  --reserve-duration 86400 \
+  --dry-run --pretty-xml
+```
+
+Change `--arch` to `s390x`, `aarch64`, or `x86_64` as needed. The `--reserve-duration` is in seconds (86400 = 24 hours).
+
+Pre-install packages so the system is ready to use on first SSH. Use `--ks-append` to inject commands into the kickstart `%post` section, which runs during initial OS setup:
+
+```bash
+bkr workflow-simple \
+  --arch ppc64le \
+  --family RedHatEnterpriseLinux9 \
+  --variant BaseOS \
+  --task /distribution/check-install \
+  --ks-append '%post
+dnf install -y git podman rsync
+%end' \
+  --reserve \
+  --reserve-duration 86400 \
+  --dry-run --pretty-xml
+```
+
+Add memory or disk requirements with `--keyvalue` (values in MB):
+
+```bash
+bkr workflow-simple \
+  --arch s390x \
+  --family RedHatEnterpriseLinux9 \
+  --variant BaseOS \
+  --keyvalue "MEMORY>8000" \
+  --keyvalue "DISKSPACE>50000" \
+  --task /distribution/check-install \
+  --reserve \
+  --reserve-duration 86400 \
+  --dry-run --pretty-xml
+```
+
+Once the XML looks right, remove `--dry-run --pretty-xml` to submit the job for real. Provisioning takes some time -- use `bkr job-watch` to monitor progress.
+
+### Monitoring your job
+
+`workflow-simple` returns a job ID (e.g., `J:12674717`). Watch it in real time:
+
+```bash
+bkr job-watch J:12674717
+```
+
+Or check status at any point:
+
+```bash
+bkr job-results J:12674717 --prettyxml
+```
+
+You can also view it in the browser at `https://beaker.engineering.redhat.com/jobs/12674717` (the numeric part without `J:`).
+
+To get the hostname of your provisioned system:
+
+```bash
+bkr job-results J:12674717 --prettyxml | grep -o 'system="[^"]*"'
+```
+
+### After provisioning
+
+When the system is ready, you'll receive an email with the system FQDN, or you can check using the CLI command above. SSH in as root (your SSH key is already installed if you configured it above). On the provisioned system, two scripts are available:
+
+- `return2beaker.sh` -- release the system early when you're done
+- `extendtesttime.sh` -- extend your reservation if you need more time
 
 ## Setting Up the Machine
 
