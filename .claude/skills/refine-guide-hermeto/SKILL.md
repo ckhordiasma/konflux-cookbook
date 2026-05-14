@@ -36,6 +36,7 @@ Read `guides/hermeto-prefetch.md` (relative to the plugin root) thoroughly befor
 
 4. **Inventory hermetic build artifacts**: Catalog all files in the repo relevant to hermetic builds:
    - Lockfiles: `package-lock.json`, `go.sum`, `Cargo.lock`, `requirements.txt`, `requirements-build.txt`, `rpms.lock.yaml`, `Gemfile.lock`, `artifacts.lock.yaml`
+   - Go workspace files: `go.work`, `go.work.sum` (if present, a single gomod prefetch entry may cover multiple modules)
    - Config: `hermeto.json`, `rpms.in.yaml`, `ubi.repo`
    - Build inputs: argfiles, `.env` files, helper scripts (`hermetic_fixes.sh`, etc.)
    - Note which files exist at the repo root vs in subdirectories (important for monorepos with multiple components)
