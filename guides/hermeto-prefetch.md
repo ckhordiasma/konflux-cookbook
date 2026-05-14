@@ -715,7 +715,13 @@ Match the `--python` version to your target image. This file is needed if any of
 
 **Important:** AIPCC wheels are built with external dependencies on system libraries installed in the corresponding AIPCC base images. Unlike upstream `manylinux` wheels which bundle their dependencies, AIPCC wheels will not work without the matching base image. Do not mix AIPCC wheels with wheels from pypi.org -- ABI incompatibilities between bundled and external dependencies can cause crashes, incorrect output, or libraries that fail to load. Each AIPCC index must be used with its corresponding base image. Pure-Python packages from PyPI are lower risk to mix in since they have no compiled components, but this is unsupported by AIPCC -- if a package you need is missing, [request it](#requesting-packages) instead.
 
-> **Note:** Some components (e.g., mlflow) temporarily prefetch a small number of packages from public PyPI alongside AIPCC -- typically pure-Python packages or compiled extensions that don't touch the accelerator stack (e.g., `psycopg2`). This can work as a short-term workaround, but the proper fix is to get the missing packages added to AIPCC so everything comes from a single, supported index.
+> **Note:** Some components (e.g., mlflow, pipelines-components) prefetch a small number of packages from public PyPI alongside AIPCC. This can work when the PyPI packages are pure-Python or link only against system libraries already present in UBI (e.g., `psycopg2` linking against `libpq`). The key safety practices are:
+>
+> 1. **Split requirements by index** — maintain separate files for AIPCC packages and PyPI packages (e.g., `requirements-aipcc.txt` and `requirements-pypi.txt`)
+> 2. **Use separate pip entries** in the hermeto config — AIPCC entries need `binary: {"arch": ":all:"}`, PyPI entries may not
+> 3. **Use `--no-deps` on every `pip install`** in the Dockerfile — this prevents pip from resolving dependencies at install time, so there is no risk of pulling the wrong version from the wrong index
+>
+> The proper fix is still to get missing packages added to AIPCC so everything comes from a single, supported index.
 
 This applies to any dependency source, not just PyPI. If your project installs packages from git URLs (e.g., `git+https://github.com/org/repo@tag`), those packages must also be published to the AIPCC index. Git-sourced dependencies are incompatible with pip's hash-checking mode, so mixing them with hashed AIPCC packages in the same requirements file does not work. The fix is to get the midstream package onboarded to AIPCC — for example, the llama-stack-provider team had garak published as `garak==0.14.1+rhaiv.8` on the AIPCC index rather than installing it from a git URL.
 
