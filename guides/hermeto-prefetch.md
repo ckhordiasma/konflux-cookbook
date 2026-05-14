@@ -578,6 +578,23 @@ uv pip compile requirements.in \
 
 If you use a custom package index (like AIPCC), add `--emit-index-annotation` so the compiled file records which index each package came from. You can also use `--index-url` in the requirements file or pass `--index` to uv to specify the index.
 
+### Alternative: `uv export` from `uv.lock`
+
+If your project uses `uv` as its package manager, you can generate `requirements.txt` from a `uv.lock` file instead of using `uv pip compile`:
+
+```bash
+uv lock
+uv export --format requirements-txt --output-file requirements.txt
+```
+
+This keeps index and resolution configuration in `pyproject.toml` rather than on the command line. Key `[tool.uv]` features that help produce the right requirements file for hermeto:
+
+- **`[[tool.uv.index]]` + `[tool.uv.sources]`** — configure per-package index routing (e.g., most packages from AIPCC, specific packages from a test index or PyPI)
+- **`environments`** — restrict resolution to target platforms only (e.g., Linux x86_64 and aarch64), preventing unnecessary platform-specific dependencies from appearing in the output
+- **`override-dependencies`** — exclude transitive dependencies not available in your index (e.g., `"modelscope; python_version < '0'"` uses an always-false marker to drop the package)
+
+Commit `uv.lock` alongside the generated `requirements.txt`. When dependencies change, run `uv lock` then `uv export` to regenerate.
+
 ### Projects with local path dependencies
 
 If your project contains multiple Python packages that depend on each other via `[tool.uv.sources]` path references, hermeto cannot resolve those local paths — it needs flat requirements files listing only external packages with pinned versions. The local packages themselves are installed from source in the Dockerfile, not prefetched.
