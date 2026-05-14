@@ -778,7 +778,7 @@ Since AIPCC only publishes wheels (no sdists), you must set `binary` in your her
 }
 ```
 
-Once the AIPCC base image is in place, no additional hermeto-specific Dockerfile modifications are needed. The pipeline's automatic `cachi2.env` injection sets `PIP_NO_INDEX=true` and `PIP_FIND_LINKS` to redirect pip to the prefetched cache. You will still need a pinned `requirements.txt` with the AIPCC `--index-url` annotation so hermeto knows where to download from, but the Dockerfile.konflux itself needs no manual env sourcing or prefetch mount paths.
+Once the AIPCC base image is in place, no additional hermeto-specific Dockerfile modifications are needed. The pipeline's automatic `cachi2.env` injection sets `PIP_NO_INDEX=true` and `PIP_FIND_LINKS` to redirect pip to the prefetched cache. You will still need a pinned `requirements.txt` with the AIPCC `--index-url` annotation so hermeto knows where to download from, but the Dockerfile.konflux itself needs no manual env sourcing or prefetch mount paths. The Dockerfile's `pip install` commands do not need to reference the requirements file — they can install packages by name (e.g., `pip install mlserver` or `pip install pyspark==${VERSION}`). The requirements file tells hermeto what to prefetch; the pipeline's `PIP_FIND_LINKS` ensures pip finds the prefetched wheels regardless of how the install is invoked.
 
 **Multi-variant builds:**
 
