@@ -115,3 +115,7 @@ in the guide. Source: `konflux-central` branch `rhoai-3.5-ea.1` pipelineruns.
 ## Validating with Konflux PR Builds
 
 - [ ] Creating a temporary pull request pipeline to test builds before merging (see existing guide: `create-pr-pipeline`)
+
+## Skills
+
+- [ ] Generalize `refine-guide-hermeto` into a generic `refine-guide` skill — the structure (clone repo, parse pipelines, compare implementation to guide, propose edits) works for any guide. Extract hermeto-specific logic (package manager enumeration, prefetch-input parsing) into parameters.
