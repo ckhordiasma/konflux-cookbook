@@ -23,11 +23,15 @@ Read `guides/hermeto-prefetch.md` (relative to the plugin root) thoroughly befor
    - `build-platforms` (multi-arch targets)
    - Pipeline reference (resolver URL, path)
 
+   A pipeline may set `hermetic: true` with no `prefetch-input` at all. This is valid when the Dockerfile has zero network access points — there is nothing to prefetch. Note this explicitly rather than treating it as missing data.
+
    Even if the user selects one pipeline, scan the `prefetch-input` of the other push pipelines in the repo. Different components in the same monorepo often reveal patterns (e.g., one component uses a single npm entry while others need multiple entries for sub-project lockfiles, or some components add gomod entries for Go BFFs). These cross-component patterns inform the guide even when only one pipeline is the focus.
 
    Cross-repo patterns are equally valuable. When running parallel agents, a workaround seen in one repo (e.g., `--prerelease=allow` for AIPCC version suffixes) often applies to all repos using the same ecosystem. The synthesis step should surface these.
 
-3. **Identify the Dockerfile pair**: The pipeline references a `Dockerfile.konflux` (or variant like `Dockerfile.konflux.mlflow`). Ask the user which file was the *original* non-hermetic Dockerfile — it may be in a different directory, use a different naming convention, or use upstream base images. Diff the two and categorize each change:
+   When multiple pipelines target the same component (e.g., push + pull-request, or an older pipeline alongside a newer one), compare their `prefetch-input` for consistency. Drift between pipeline files — such as a stale pipeline missing a newly added gomod entry — is worth flagging.
+
+3. **Identify the Dockerfile pair**: The pipeline references a `Dockerfile.konflux` (or variant like `Dockerfile.konflux.mlflow`). Identify the *original* non-hermetic Dockerfile — it is usually `Dockerfile` or `Containerfile` in the same directory, but may be in a different directory, use a different naming convention, or use upstream base images. When running as a background agent, infer the original by looking for `Dockerfile`, `Containerfile`, or similarly named files; when running interactively, ask the user to confirm. Diff the two and categorize each change:
    - **Hermetic-specific**: offline install flags, prefetch mount paths, workaround scripts for hermetic builds
    - **Konflux-specific but not hermetic**: base image pinning by digest, replacing upstream images with UBI/Red Hat equivalents, hardcoding build args, adding LABEL metadata, changing CGO/linker flags
    - **Structural**: restructuring COPY patterns, changing build context, workspace-aware builds vs standalone builds
@@ -36,6 +40,8 @@ Read `guides/hermeto-prefetch.md` (relative to the plugin root) thoroughly befor
 
    Finding **zero hermetic-specific changes** is a valid and important result — it means the Konflux pipeline's automatic cachi2.env injection and volume mounts were sufficient without any manual Dockerfile modifications. Report this explicitly. When analyzing multiple repos, track the zero-change count (e.g., "4/6 repos needed no hermetic Dockerfile changes") — if most repos need no changes, that's a signal the guide should set that expectation upfront.
 
+   Also look for **network-elimination strategies** — cases where the developer removed network access points from Dockerfile.konflux instead of prefetching them. Common patterns: multi-stage `COPY --from=` to extract binaries from trusted images, switching to a base image that already includes needed tools, or adding a tool's source as a git submodule and building it from source. These are alternatives to the generic fetcher that the guide should document.
+
    Note: Categorize "Konflux-specific but not hermetic" findings separately. These belong in a Dockerfile.konflux best practices guide, not in the hermeto prefetch guide. Track them as TODO items rather than proposing edits to `guides/hermeto-prefetch.md`.
 
 4. **Inventory hermetic build artifacts**: Catalog all files in the repo relevant to hermetic builds:
@@ -43,6 +49,8 @@ Read `guides/hermeto-prefetch.md` (relative to the plugin root) thoroughly befor
    - Go workspace files: `go.work`, `go.work.sum` (if present, a single gomod prefetch entry may cover multiple modules)
    - Config: `hermeto.json`, `rpms.in.yaml`, `ubi.repo`
    - Build inputs: argfiles, `.env` files, helper scripts (`hermetic_fixes.sh`, etc.)
+   - Git submodules (`.gitmodules`) — submodules that replace runtime downloads (e.g., building yq from source instead of curling a binary)
+   - Git LFS objects — large binaries committed via LFS that replace runtime downloads (check `.gitattributes` for LFS-tracked paths)
    - Note which files exist at the repo root vs in subdirectories (important for monorepos with multiple components)
 
 5. **Walk through the guide**: Read `guides/hermeto-prefetch.md` and simulate following it step-by-step for this repo. For each section of the guide, check whether it would lead a reader to the same implementation:
