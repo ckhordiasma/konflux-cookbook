@@ -151,6 +151,8 @@ Requires `go.mod` and `go.sum`.
 {"type": "gomod", "path": "."}
 ```
 
+Go projects are often the simplest case for hermetic builds — the `gomod` prefetch combined with the pipeline's automatic `cachi2.env` injection is usually sufficient with no Dockerfile.konflux modifications. If your Go project has no other network access points (no `npm`, `pip`, `microdnf install`, `curl`, etc.), you may only need the Konflux-general changes (base image pinning, labels) and a single `{"type": "gomod"}` prefetch entry.
+
 ### npm (JavaScript)
 
 [Hermeto npm docs](https://hermetoproject.github.io/hermeto/latest/npm/)
