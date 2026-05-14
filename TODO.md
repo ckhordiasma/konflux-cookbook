@@ -28,7 +28,7 @@ in the guide. Source: `konflux-central` branch `rhoai-3.5-ea.1` pipelineruns.
 - [x] [eval-hub](https://github.com/red-hat-data-services/eval-hub) — gomod only, zero hermetic Dockerfile changes
 - [x] [kserve-autogluon-server](https://github.com/red-hat-data-services/kserve-autogluon-server) — pip/AIPCC only, zero hermetic Dockerfile changes, local path deps pattern
 - [x] [kube-auth-proxy](https://github.com/red-hat-data-services/kube-auth-proxy) — gomod only, zero hermetic Dockerfile changes, Go workspace (`go.work`) covers multi-module deps
-- [ ] [kube-rbac-proxy](https://github.com/red-hat-data-services/kube-rbac-proxy)
+- [x] [kube-rbac-proxy](https://github.com/red-hat-data-services/kube-rbac-proxy) — gomod only, zero hermetic Dockerfile changes, `go mod vendor` + `-mod=vendor` pattern works with prefetched cache
 - [ ] [kuberay](https://github.com/red-hat-data-services/kuberay)
 - [ ] [llama-stack-provider-trustyai-garak](https://github.com/red-hat-data-services/llama-stack-provider-trustyai-garak)
 - [ ] [llm-d-kv-cache](https://github.com/red-hat-data-services/llm-d-kv-cache)
