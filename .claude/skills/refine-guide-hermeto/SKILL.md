@@ -63,6 +63,8 @@ Read `guides/hermeto-prefetch.md` (relative to the plugin root) thoroughly befor
 
    Separate hermeto-specific findings (belong in `guides/hermeto-prefetch.md`) from Konflux-general findings (base image pinning, build-arg patterns, labels, Renovate config). Propose Konflux-general items as TODO entries rather than guide edits.
 
+   **Synthesizing across multiple repos:** When agents analyzed multiple repos in parallel, deduplicate and merge their findings before presenting. Group findings by topic (not by repo), note how many repos exhibited each pattern, and prioritize by frequency — a pattern seen in 5/6 repos is a stronger signal than one seen in 1/6. Include repo-specific quirks if they relate to hermetic builds (e.g., a workaround for a hermeto bug in one repo), but flag them as single-repo observations rather than general patterns.
+
 7. **Apply improvements incrementally**: Work through findings one at a time rather than presenting all edits upfront. For each finding:
    - Present the finding and propose a concrete edit (section name, what to add/change, and why)
    - Let the user review and refine the wording
