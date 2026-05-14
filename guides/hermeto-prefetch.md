@@ -800,7 +800,12 @@ AIPCC base images come with build toolchains (gcc, make, python-devel, etc.) pre
 
 **Multi-variant builds:**
 
-If your component builds for multiple accelerators (CPU, CUDA, ROCm), you may want to maintain separate requirements files per variant (e.g., `requirements.cpu.txt`, `requirements.cuda.txt`) and use build-args to select the right one at build time. The notebooks component does this with a `build-args/konflux.{variant}.conf` file that sets the index URL and base image for each variant (e.g., [CPU config](https://github.com/red-hat-data-services/notebooks/blob/1e60d9cb49ec28740e89ac8ce5ded897f86f775b/jupyter/datascience/ubi9-python-3.12/build-args/konflux.cpu.conf), [CUDA config](https://github.com/red-hat-data-services/notebooks/blob/1e60d9cb49ec28740e89ac8ce5ded897f86f775b/jupyter/pytorch/ubi9-python-3.12/build-args/konflux.cuda.conf)).
+If your component builds for multiple accelerators (CPU, CUDA, ROCm), you need separate requirements files per variant (e.g., `requirements.cpu.txt`, `requirements.cuda.txt`) since each variant pulls from a different AIPCC index with different packages.
+
+There are two approaches to structuring multi-variant builds:
+
+- **Argfiles with a shared Dockerfile** — use `build-args/konflux.{variant}.conf` files to set the index URL, base image, and a flavor variable (e.g., `PYLOCK_FLAVOR=cpu`) that the Dockerfile uses to select `requirements.${PYLOCK_FLAVOR}.txt`. The notebooks component uses this pattern ([CPU config](https://github.com/red-hat-data-services/notebooks/blob/1e60d9cb49ec28740e89ac8ce5ded897f86f775b/jupyter/datascience/ubi9-python-3.12/build-args/konflux.cpu.conf), [CUDA config](https://github.com/red-hat-data-services/notebooks/blob/1e60d9cb49ec28740e89ac8ce5ded897f86f775b/jupyter/pytorch/ubi9-python-3.12/build-args/konflux.cuda.conf)).
+- **Separate Dockerfiles per variant** — use `Dockerfile.konflux.cpu`, `Dockerfile.konflux.cuda`, `Dockerfile.konflux.rocm` with each pipeline pointing at a different Dockerfile. This is better when variants differ structurally (different stages, variant-specific build steps like ROCm solib linking). The distributed-workloads component uses this pattern.
 
 **Transitional builds (`hermetic: false` with `prefetch-input`):**
 
