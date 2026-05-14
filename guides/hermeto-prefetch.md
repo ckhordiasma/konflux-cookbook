@@ -182,6 +182,8 @@ Requires `package.json` and `package-lock.json`.
 
 Run `find . -name package-lock.json -not -path '*/node_modules/*'` to find all lockfiles that may need entries.
 
+> **Note:** `npm ci --ignore-scripts` and `npm install --ignore-scripts` work correctly with prefetch. The `--ignore-scripts` flag skips lifecycle scripts (preinstall, postinstall, etc.) and is a good security practice for container builds since it prevents arbitrary code execution during dependency installation.
+
 ### yarn (JavaScript)
 
 [Hermeto yarn docs](https://hermetoproject.github.io/hermeto/latest/yarn/)
