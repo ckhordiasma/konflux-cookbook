@@ -736,7 +736,17 @@ AIPCC provides separate indexes per RHOAI release and accelerator variant. Brows
 
 The full index URL prefix is `https://console.redhat.com/api/pypi/public-rhai/`. The base images are pre-configured so that `pip` and `uv` pull from the matching index automatically.
 
-To request a new package or version, use the [AIPCC package request form](https://dashboard.aipcc.redhat.com/package-request) or file a Jira under [AIPCC-1](https://issues.redhat.com/browse/AIPCC-1).
+#### Requesting packages
+
+If a package you need is missing from the AIPCC index, submit a request through the [AIPCC package request form](https://dashboard.aipcc.redhat.com/package-request) (requires Red Hat VPN). See the [package onboarding docs](https://package-onboarding-0af11e.gitlab.io/) for the full process.
+
+Key points:
+- **One submission per PyPI package** — sub-packages with separate PyPI entries need separate requests
+- **Transitive dependencies are handled automatically** — only request top-level packages
+- **The form handles updates and rebuilds too** — use it for new versions, not just new packages
+- **Include a target date and release commitment** if urgent — simple packages can be same-day, complex native builds take longer
+
+Ask in [#forum-aipcc](https://redhat-internal.slack.com/archives/C07JX0EMKCZ) for general questions or [#forum-aipcc-wheels](https://redhat-internal.slack.com/archives/C079FE5H94J) for wheel-specific issues.
 
 **Getting started with AIPCC:**
 
