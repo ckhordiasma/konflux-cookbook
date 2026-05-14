@@ -54,8 +54,9 @@ in the guide. Source: `konflux-central` branch `rhoai-3.5-ea.1` pipelineruns.
 - [x] [kuberay](https://github.com/red-hat-data-services/kuberay) — gomod only, zero hermetic Dockerfile changes, `path` matches `path-context` for subdirectory builds
 - [x] [llama-stack-provider-trustyai-garak](https://github.com/red-hat-data-services/llama-stack-provider-trustyai-garak) — pip/AIPCC + RPMs, zero hermetic Dockerfile changes, git dep migrated to AIPCC, permissive mode, CodeReady Builder repos
 - [x] [llm-d-kv-cache](https://github.com/red-hat-data-services/llm-d-kv-cache) — pip/AIPCC only, zero hermetic Dockerfile changes, `uv export` workflow, bad hash workaround
+- [x] [mlflow](https://github.com/red-hat-data-services/mlflow) — pip/AIPCC + PyPI + yarn + RPMs, mixed-source pattern with `--no-deps`, stock UBI9 (no AIPCC base image), multi-arch compile.py, RHOAI push `hermetic: false` pending yarn support
 - [ ] [mlflow-operator](https://github.com/red-hat-data-services/mlflow-operator)
-- [ ] [mlserver](https://github.com/red-hat-data-services/mlserver)
+- [x] [mlserver](https://github.com/red-hat-data-services/mlserver) — pip/AIPCC only, zero hermetic Dockerfile changes, installs by package name not `-r requirements.txt`
 - [ ] [model-metadata-collection](https://github.com/red-hat-data-services/model-metadata-collection)
 - [ ] [model-registry-operator](https://github.com/red-hat-data-services/model-registry-operator)
 - [ ] [models-perf-benchmark-data](https://github.com/red-hat-data-services/models-perf-benchmark-data)
@@ -63,7 +64,7 @@ in the guide. Source: `konflux-central` branch `rhoai-3.5-ea.1` pipelineruns.
 - [ ] [odh-cli](https://github.com/red-hat-data-services/odh-cli)
 - [ ] [ogx-k8s-operator](https://github.com/red-hat-data-services/ogx-k8s-operator)
 - [ ] [rhods-operator](https://github.com/red-hat-data-services/rhods-operator)
-- [ ] [spark-operator](https://github.com/red-hat-data-services/spark-operator)
+- [x] [spark-operator](https://github.com/red-hat-data-services/spark-operator) — gomod + pip/AIPCC + RPMs, EPEL for tini, installs by package name not `-r requirements.txt`
 - [ ] [trainer](https://github.com/red-hat-data-services/trainer)
 - [ ] [training-operator](https://github.com/red-hat-data-services/training-operator)
 - [ ] [trustyai-explainability](https://github.com/red-hat-data-services/trustyai-explainability)
@@ -84,13 +85,13 @@ in the guide. Source: `konflux-central` branch `rhoai-3.5-ea.1` pipelineruns.
 #### Partially hermetic (some components hermetic, some not)
 
 - [ ] [kserve](https://github.com/red-hat-data-services/kserve) — 6/7 hermetic (storage-initializer is not)
-- [ ] [distributed-workloads](https://github.com/red-hat-data-services/distributed-workloads) — 3/11 hermetic (th06-cpu/cuda130/rocm64; odh-training-* images are not)
+- [x] [distributed-workloads](https://github.com/red-hat-data-services/distributed-workloads) — 3/11 hermetic (th06-cpu/cuda130/rocm64; odh-training-* images are not), `uv pip install` requires explicit `--no-index --find-links`, `unsafe-best-match` strategy
 - [ ] [RHOAI-Build-Config](https://github.com/red-hat-data-services/RHOAI-Build-Config) — 2/4 hermetic (operator-bundle, fbc-fragment; chart builds are not)
-- [ ] [pipelines-components](https://github.com/red-hat-data-services/pipelines-components) — 2/3 hermetic (automl, autorag; main build is not)
+- [x] [pipelines-components](https://github.com/red-hat-data-services/pipelines-components) — 2/3 hermetic (automl, autorag; main build is not), AIPCC + PyPI mixed sources, generic fetcher for ML models/SQLite, AIPCC test index
 - [ ] [feast](https://github.com/red-hat-data-services/feast) — 1/2 hermetic (feast-operator; feature-server is not)
 - [ ] [model-registry](https://github.com/red-hat-data-services/model-registry) — 1/2 hermetic (model-registry; job-async-upload is not)
 - [ ] [trustyai-service-operator](https://github.com/red-hat-data-services/trustyai-service-operator) — 1/2 hermetic (operator; ta-lmes-driver is not)
-- [ ] [notebooks](https://github.com/red-hat-data-services/notebooks) — 1/18 hermetic (codeserver-datascience-cpu only; rest pending AIPCC-7795)
+- [x] [notebooks](https://github.com/red-hat-data-services/notebooks) — 1/18 hermetic (codeserver-datascience-cpu only; rest pending AIPCC-7795), argfile multi-variant pattern, transitional `hermetic: false` + `prefetch-input`
 
 ## Dockerfile.konflux Best Practices
 
