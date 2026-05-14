@@ -391,7 +391,7 @@ podman build . \
 ```
 
 - `--network none` proves that all dependencies are actually prefetched.
-- The `.` after `podman build` is the build context directory -- change it if your Dockerfile expects a different context (e.g., a subdirectory).
+- The `.` after `podman build` is the build context directory. Change it if your Dockerfile expects a different context. For example, if your pipeline uses `path-context: python` and `dockerfile: ../Dockerfile.konflux`, run `podman build python/ -f .hermeto/Dockerfile.konflux ...` — the context is the subdirectory, but the Dockerfile remains at the repo root. Getting this wrong causes `COPY` instructions to fail with confusing "file not found" errors.
 - The RPM `repos.d` volume mount is only needed if you use the RPM prefetcher. Omit it if you don't prefetch RPMs.
 - On Apple Silicon Macs, `uname -m` returns `arm64` but the RPM repo path uses the Linux name `aarch64`. Replace `$(uname -m)` with `aarch64` explicitly.
 
