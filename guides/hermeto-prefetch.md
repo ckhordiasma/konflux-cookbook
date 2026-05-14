@@ -451,6 +451,43 @@ Exclude local build artifacts and dependency caches that aren't needed on the re
 
 Then SSH in and run the `podman build` from [step 4](#4-test-locally-with-a-hermetic-build). The remote host only needs `podman` -- it doesn't need hermeto, uv, or any other tooling.
 
+### Container registry auth on remote hosts
+
+If your Dockerfile pulls from a private registry (e.g., `quay.io/aipcc/base-images/...`), the remote host needs credentials to pull the base image. Don't copy your full `~/.config/containers/auth.json` -- it contains tokens for every registry you've ever logged into.
+
+**Option 1: `podman login` on the remote host**
+
+SSH in and log in directly to the registry that hosts your base image:
+
+```bash
+ssh root@remote-host
+podman login quay.io
+```
+
+Enter your Quay credentials when prompted. This creates an `auth.json` on the remote host scoped to just that registry.
+
+**Option 2: Extract a registry-scoped auth snippet**
+
+If you can't log in interactively on the remote host (e.g., scripted provisioning), extract just the auth entry for the needed registry from your local auth file and send only that:
+
+```bash
+# Extract only the quay.io auth entry from your local auth.json
+python3 -c "
+import json, sys
+auth = json.load(open(sys.argv[1]))
+scoped = {'auths': {k: v for k, v in auth['auths'].items() if 'quay.io' in k}}
+json.dump(scoped, sys.stdout, indent=2)
+" ~/.config/containers/auth.json > /tmp/quay-auth.json
+
+# Copy the scoped file to the remote host
+scp /tmp/quay-auth.json root@remote-host:~/.config/containers/auth.json
+rm /tmp/quay-auth.json
+```
+
+This avoids exposing credentials for registries unrelated to the build.
+
+> **Note:** On RHEL 9 / Beaker hosts, rootful podman reads auth from `~/.config/containers/auth.json`. If `podman pull` still shows `unauthorized`, check which path podman is reading with `podman info | grep auth` and place the file accordingly.
+
 For projects where you test on remote hosts frequently, a wrapper script avoids repeating these steps:
 
 ```bash
@@ -809,7 +846,12 @@ uv pip compile pyproject.toml \
   -o requirements.txt
 ```
 
-If your requirements pin AIPCC-specific versions with release suffixes like `vllm==0.18.0+rhaiv.4`, add `--prerelease=allow` — `uv` treats the `+rhaiv` local version segment as a pre-release and skips it by default.
+If your requirements pin AIPCC-specific versions with release suffixes like `vllm==0.18.0+rhaiv.4`, you need to tell `uv` to allow pre-releases — it treats the `+rhaiv` local version segment as a pre-release and skips it by default. Prefer `--prerelease=if-necessary` over `--prerelease=allow`:
+
+- **`--prerelease=if-necessary`** — only uses a pre-release when no stable version satisfies the constraint. This is safer for multi-arch builds because it avoids pulling release candidates that may only have wheels for a subset of architectures.
+- **`--prerelease=allow`** — allows pre-releases for all packages, which can pull RC versions (e.g., `safetensors==0.8.0rc0`) that have wheels on some architectures but not others, causing builds to fail on the missing arch.
+
+Use `--prerelease=allow` only if you specifically need an RC version. See [AIPCC: pre-release versions break multi-arch builds](#aipcc-pre-release-versions-break-multi-arch-builds) for details.
 
 **Critical: `--index-url` must be a pip directive in requirements.txt.** Hermeto reads `--index-url` directives from requirements files to know where to download packages. The `--emit-index-annotation` flag only adds comments (e.g., `# from https://...`), which hermeto ignores — without an actual `--index-url` directive, hermeto defaults to PyPI and fetches `manylinux` wheels or sdists instead of AIPCC's `linux_*` wheels. Add `--index-url` to the top of your compiled requirements.txt:
 
@@ -1152,6 +1194,29 @@ If you have a regeneration script (see [Alternative: `uv export` from `uv.lock`]
 AIPCC publishes wheels with build numbers in the filename (e.g., `torch-2.10.0-2-cp312-cp312-linux_x86_64.whl` where `-2` is a build tag). When AIPCC rebuilds a package, the old build remains on the index alongside the new one. Hermeto fetches all available builds for a given version, which can significantly inflate the prefetch size.
 
 **Workaround:** Add `--generate-hashes` to your `uv pip compile` command. The hashes pin to specific wheel files, so hermeto downloads only the exact builds your requirements reference rather than every build of that version. This also improves reproducibility.
+
+### AIPCC: pre-release versions break multi-arch builds
+
+AIPCC may publish release candidate versions (e.g., `safetensors==0.8.0rc0`) for some architectures before others. If `uv pip compile --prerelease=allow` picks one of these RC versions, the compiled requirements work on architectures that have the RC wheel but fail on architectures that don't — typically s390x or ppc64le, which receive new builds later.
+
+**Example:** `safetensors==0.8.0rc0` had wheels for x86_64, aarch64, and ppc64le on the AIPCC index but not s390x (which only had `0.7.0`). The build succeeded on three arches and failed on s390x with `No matching distribution found for safetensors==0.8.0rc0`.
+
+**Fix:** Use `--prerelease=if-necessary` instead of `--prerelease=allow`. This tells `uv` to only use a pre-release version when no stable version satisfies the constraint, which avoids accidentally picking RC versions that lack full architecture coverage:
+
+```bash
+uv pip compile pyproject.toml \
+  --python-platform linux \
+  --python-version 3.12 \
+  --index https://console.redhat.com/api/pypi/public-rhai/rhoai/3.5-EA1/cpu-ubi9/simple/ \
+  --index-strategy first-index \
+  --prerelease=if-necessary \
+  --emit-index-annotation \
+  -o requirements.txt
+```
+
+If you need a specific RC version, pin it explicitly in your constraints instead of using `--prerelease=allow` globally.
+
+**Diagnosis:** When a multi-arch build fails with `No matching distribution found` for a package with an RC version number, check whether the AIPCC index has that version for all target architectures. Browse the index at `https://console.redhat.com/api/pypi/public-rhai/rhoai/{release}/{variant}/simple/{package}/` and look for wheels with your failing architecture's platform tag (e.g., `linux_s390x`).
 
 ### macOS: sed command for Dockerfile injection
 

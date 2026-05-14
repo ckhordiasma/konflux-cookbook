@@ -153,6 +153,17 @@ bkr workflow-simple \
   --dry-run --pretty-xml
 ```
 
+**Pre-check system availability before submitting.** If no systems match your constraints, the job aborts immediately with "does not match any systems." Use `bkr system-list` to verify that matching systems exist:
+
+```bash
+# Check how many systems match your arch + hardware constraints
+bkr system-list --arch=s390x --type=Machine --status=Automated \
+  --xml-filter='<and><key_value key="MEMORY" op=">" value="8000"/><key_value key="DISKSPACE" op=">" value="50000"/></and>' \
+  | wc -l
+```
+
+If the count is zero, relax your constraints (drop `DISKSPACE`, lower `MEMORY`, etc.) before submitting. Drop `--xml-filter` entirely to see all available systems for an architecture.
+
 Once the XML looks right, remove `--dry-run --pretty-xml` to submit the job for real. Provisioning takes some time -- use `bkr job-watch` to monitor progress.
 
 ### Monitoring your job
