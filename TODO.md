@@ -16,6 +16,10 @@
 - [ ] RPM-specific Hermeto gotchas
 - [ ] Leveraging AIPCC Python wheel releases
 
+### Investigation
+
+- [ ] [model-metadata-collection](https://github.com/red-hat-data-services/model-metadata-collection) — Dockerfile.konflux has zero network access (pure data container: only COPYs YAML files), yet pipeline has `prefetch-input: {"type": "gomod", "path": "."}` and `hermetic: true`. Investigate whether this is for SBOM/provenance tracking, or if there's another reason. If SBOM-only, consider documenting the "data-only container" pattern in the guide.
+
 ### Repo Cleanup
 
 - [ ] [llama-stack-provider-trustyai-garak](https://github.com/red-hat-data-services/llama-stack-provider-trustyai-garak) — remove vestigial dummy Cargo project (`Cargo.toml`, `Cargo.lock`, `.konflux/main.rs`) and per-arch pip workaround files (`.konflux/s390x`, `.konflux/ppc64le`, `.konflux/prep-hermeto.sh`). These were workarounds for hermeto bugs ([#1205](https://github.com/hermetoproject/hermeto/issues/1205)) that are no longer used now that AIPCC provides prebuilt wheels.
@@ -55,10 +59,10 @@ in the guide. Source: `konflux-central` branch `rhoai-3.5-ea.1` pipelineruns.
 - [x] [llama-stack-provider-trustyai-garak](https://github.com/red-hat-data-services/llama-stack-provider-trustyai-garak) — pip/AIPCC + RPMs, zero hermetic Dockerfile changes, git dep migrated to AIPCC, permissive mode, CodeReady Builder repos
 - [x] [llm-d-kv-cache](https://github.com/red-hat-data-services/llm-d-kv-cache) — pip/AIPCC only, zero hermetic Dockerfile changes, `uv export` workflow, bad hash workaround
 - [x] [mlflow](https://github.com/red-hat-data-services/mlflow) — pip/AIPCC + PyPI + yarn + RPMs, mixed-source pattern with `--no-deps`, stock UBI9 (no AIPCC base image), multi-arch compile.py, RHOAI push `hermetic: false` pending yarn support
-- [ ] [mlflow-operator](https://github.com/red-hat-data-services/mlflow-operator)
+- [x] [mlflow-operator](https://github.com/red-hat-data-services/mlflow-operator) — gomod only, zero hermetic Dockerfile changes, `replace` directive unifies multi-module (`api/`) under single gomod entry
 - [x] [mlserver](https://github.com/red-hat-data-services/mlserver) — pip/AIPCC only, zero hermetic Dockerfile changes, installs by package name not `-r requirements.txt`
-- [ ] [model-metadata-collection](https://github.com/red-hat-data-services/model-metadata-collection)
-- [ ] [model-registry-operator](https://github.com/red-hat-data-services/model-registry-operator)
+- [x] [model-metadata-collection](https://github.com/red-hat-data-services/model-metadata-collection) — gomod only, zero hermetic Dockerfile changes, data-only container (no `go build` in Dockerfile), prefetch likely for SBOM/provenance only
+- [x] [model-registry-operator](https://github.com/red-hat-data-services/model-registry-operator) — gomod only, zero hermetic Dockerfile changes, FIPS build flags (`strictfipsruntime`)
 - [ ] [models-perf-benchmark-data](https://github.com/red-hat-data-services/models-perf-benchmark-data)
 - [ ] [must-gather](https://github.com/red-hat-data-services/must-gather)
 - [ ] [odh-cli](https://github.com/red-hat-data-services/odh-cli)

@@ -17,7 +17,7 @@ The `-v "$PWD:$PWD:z"` flag bind-mounts your project directory into the containe
 
 ## Configuring `hermeto.json`
 
-The first step is to create a correct hermeto config. This is a JSON array of package manager objects, each with a `type` field and manager-specific options. In this guide, we save it to a file called `hermeto.json` for local testing, but in your Konflux build pipeline the JSON is typically inlined as a parameter to the prefetch task.
+The first step is to create a correct hermeto config. This is a JSON array of package manager objects, each with a `type` field and manager-specific options. In this guide, we save it to a file called `hermeto.json` for local testing, but in your Konflux build pipeline the JSON is typically inlined as a parameter to the prefetch task. For single-manager configs, the pipeline also accepts a bare JSON object (e.g., `{"type": "gomod", "path": "."}`) without the array wrapper.
 
 **`path` is relative to the repo root, not to `path-context`.** In a Konflux pipeline, the `path-context` parameter sets the Docker build context directory, and the `dockerfile` parameter locates the Dockerfile relative to that context. The `path` field in the hermeto config is independent — it is always relative to the repo root (where hermeto's `--source` points). For subdirectory builds, these often have the same value (e.g., `path-context: ray-operator` and `"path": "ray-operator"`), but they serve different purposes and can diverge.
 
