@@ -153,6 +153,19 @@ Requires `go.mod` and `go.sum`.
 
 Go projects are often the simplest case for hermetic builds — the `gomod` prefetch combined with the pipeline's automatic `cachi2.env` injection is usually sufficient with no Dockerfile.konflux modifications. If your Go project has no other network access points (no `npm`, `pip`, `microdnf install`, `curl`, etc.), you may only need the Konflux-general changes (base image pinning, labels) and a single `{"type": "gomod"}` prefetch entry.
 
+**Multi-module repos with Go workspaces:** If your repo contains multiple Go modules (separate `go.mod` files), check whether they're joined by a [`go.work`](https://go.dev/doc/tutorial/workspaces) file. When a `go.work` exists at the workspace root, Go tooling unifies the dependency graph across all workspace modules. A single `{"type": "gomod", "path": "."}` entry pointing at the workspace root is sufficient — hermeto's Go tooling respects the workspace and prefetches dependencies for all included modules.
+
+Without `go.work`, each module needs its own gomod entry:
+
+```json
+[
+  {"type": "gomod", "path": "."},
+  {"type": "gomod", "path": "submodule"}
+]
+```
+
+Run `find . -name go.mod -not -path '*/vendor/*'` to locate all Go modules. If they share most dependencies, consider adding a `go.work` file to simplify the prefetch config to a single entry.
+
 ### npm (JavaScript)
 
 [Hermeto npm docs](https://hermetoproject.github.io/hermeto/latest/npm/)
