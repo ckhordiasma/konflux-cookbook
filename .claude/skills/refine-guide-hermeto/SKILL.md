@@ -12,7 +12,7 @@ Read `guides/hermeto-prefetch.md` (relative to the plugin root) thoroughly befor
 
 1. **Get repo and branch**: If no repo is specified in the arguments, read `TODO.md` (relative to the cookbook root) and find the next unchecked repo under the "Refine Hermeto Guide Against Real Repos" section. The TODO section header specifies the branch to use. Present the repo and branch to the user for confirmation before proceeding. If the user provides a repo in the arguments, use that instead. Clone the repo at the specified branch into `.claude/repos/<repo-name>-<branch>` (relative to the cookbook root) so it doesn't pollute the project. If the directory already exists from a previous run, ask whether to re-clone or reuse it.
 
-2. **Find and parse PipelineRuns**: List `.tekton/*.yaml` files in the cloned repo. Present them to the user and ask which push pipeline(s) to analyze (there may be multiple components). For each selected pipeline, extract:
+2. **Find and parse PipelineRuns**: List `.tekton/*.yaml` files in the cloned repo. If there is only one push pipeline, proceed with it directly. If there are multiple, present them to the user and ask which push pipeline(s) to analyze. For each selected pipeline, extract:
    - `hermetic` flag (true/false)
    - `prefetch-input` (the hermeto config JSON)
    - `DOCKERFILE` parameter
@@ -48,6 +48,8 @@ Read `guides/hermeto-prefetch.md` (relative to the plugin root) thoroughly befor
    - **"Common Gotchas"**: Are there workarounds in the implementation that aren't documented? Are there gotchas in the guide that don't apply?
 
    **Verify claims against upstream docs.** Before asserting how a package manager or hermeto feature works, check the [hermeto docs](https://hermetoproject.github.io/hermeto/latest/) to confirm. Do not assume behavior from a single repo's pipeline config — the config may be incorrect, outdated, or cargo-culted. The guide should reflect how hermeto actually works, not just how one team configured it.
+
+   **Verify before asserting "required" or "essential."** When a repo uses a particular flag or pattern, confirm whether it is truly necessary or just a defensive practice. Check what environment variables hermeto actually sets (e.g., `PIP_NO_INDEX` vs `PIP_INDEX_URL`), understand flag/env-var precedence for the relevant tools, and test your reasoning against the hermeto docs. Present findings as observations from the repo until verified — "this repo uses X" is safer than "X is required for hermetic builds" until you have confirmed the mechanism.
 
 6. **Present findings**: Summarize in three categories:
    - **Guide got right**: Areas where the implementation matches guide instructions — a reader would arrive at the same result.
