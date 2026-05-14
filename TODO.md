@@ -16,6 +16,11 @@
 - [ ] RPM-specific Hermeto gotchas
 - [ ] Leveraging AIPCC Python wheel releases
 
+## Dockerfile.konflux Best Practices
+
+- [ ] Guide on creating a Dockerfile.konflux from an upstream Dockerfile -- covers base image pinning by digest, build-arg simplification (hardcoding variant-specific values), label changes, and other Konflux-general practices that aren't hermeto-specific
+- [ ] Renovate guide -- how Renovate auto-updates pinned base image digests in Dockerfiles, and how this interacts with build-arg patterns (currently Renovate scans `FROM` lines for digest pins, so switching to `ARG BASE_IMAGE=...@sha256:...` + `FROM ${BASE_IMAGE}` may require renovate config changes to keep automated updates working)
+
 ## Conforma Compliance
 
 - [ ] Getting your build to pass Conforma compliance checks
