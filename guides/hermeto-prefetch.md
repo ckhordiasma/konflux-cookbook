@@ -936,25 +936,30 @@ context:
     stageName: base
 ```
 
-The `context.containerfile` field tells the lockfile generator which Dockerfile stage needs these packages, so it can resolve the correct base image repositories. You can select the target stage by `stageName`, `imagePattern`, or `stageNum` — or omit all three when the Dockerfile has a single `FROM`. See the [rpm-lockfile-prototype docs](https://github.com/konflux-ci/rpm-lockfile-prototype) for the full syntax.
+The `context.containerfile` field tells the lockfile generator which Dockerfile stage needs these packages, so it can resolve the correct base image repositories. You can select the target stage by `stageName`, `imagePattern`, or `stageNum` — or omit all three to default to the last stage. This works for both single-stage and multi-stage Dockerfiles, and covers the common pattern where RPMs are installed in the final (runtime) stage. See the [rpm-lockfile-prototype docs](https://github.com/konflux-ci/rpm-lockfile-prototype) for the full syntax.
+
+The `containerfile` value can be either an object (with `file`, `stageName`, etc.) or a bare string path. The bare string form is equivalent to an object with just `file` set:
 
 ```yaml
-# Multi-stage: match by stage name
+# Bare string (simplest — defaults to last stage)
+context:
+  containerfile: Dockerfile.konflux
+
+# Bare string with a subdirectory path
+context:
+  containerfile: Dockerfiles/Dockerfile.konflux
+
+# Object form: match by stage name
 context:
   containerfile:
     file: "./Dockerfile.konflux"
     stageName: base
 
-# Match by base image pattern
+# Object form: match by base image pattern
 context:
   containerfile:
     file: Dockerfiles/controller.Dockerfile.konflux
     imagePattern: ubi9/ubi-minimal
-
-# Single FROM: no stage identifier needed
-context:
-  containerfile:
-    file: Dockerfile.konflux
 ```
 
 The `contentOrigin` section can also be inlined instead of referencing a repo file. Include CodeReady Builder repos if you need packages like `ninja-build` that aren't in baseos or appstream:
