@@ -312,6 +312,8 @@ Each artifact requires a `checksum` in `algorithm:hash` format. Downloaded files
 {"type": "generic", "path": "."}
 ```
 
+**Java/Maven projects:** Hermeto has no native Maven package manager type. For Red Hat productized Java builds, the typical pattern is to build the artifact externally using [PNC](https://github.com/project-newcastle) (Project Newcastle), then use the generic fetcher to download the pre-built artifact into the hermetic build. A CI workflow (e.g., a GitHub Action) triggers the PNC build, extracts the artifact URL and checksum, and commits the resulting `artifacts.lock.yaml`. The Dockerfile.konflux then just unpacks the pre-built artifact — no `mvn` or `gradle` runs inside the container at all. See [trustyai-explainability](https://github.com/red-hat-data-services/trustyai-explainability/tree/rhoai-3.5-ea.1) for a working example of this pattern.
+
 ## Recommended Workflow
 
 ### Create a Dockerfile.konflux
