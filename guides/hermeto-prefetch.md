@@ -823,14 +823,15 @@ Start by getting your build working non-hermetically using the AIPCC base image 
 
 The `red-hat-data-services/notebooks` repo has already onboarded to AIPCC and shows working combinations of base images and index URLs across RHOAI releases and accelerator variants.
 
-Point `uv pip compile` at the AIPCC index with `--index` and `--index-strategy first-index`. `--emit-index-annotation` is optional but useful -- it annotates each package with the index it was resolved from, making it easy to trace sourcing:
+Point `uv pip compile` at the AIPCC index with `--default-index` and `--index-strategy first-index`. Use `--emit-index-url` so the compiled output includes an `--index-url` pip directive that hermeto can read. `--emit-index-annotation` is optional but useful -- it annotates each package with the index it was resolved from, making it easy to trace sourcing:
 
 ```bash
 uv pip compile requirements.in \
   --python-platform linux \
   --python-version 3.12 \
-  --index https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9/simple/ \
+  --default-index https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9/simple/ \
   --index-strategy first-index \
+  --emit-index-url \
   --emit-index-annotation \
   -o requirements.txt
 ```
@@ -840,11 +841,14 @@ If your project uses extras:
 uv pip compile pyproject.toml \
   --python-platform linux \
   --extra server --extra tracing \
-  --index https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9/simple/ \
+  --default-index https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9/simple/ \
   --index-strategy first-index \
+  --emit-index-url \
   --emit-index-annotation \
   -o requirements.txt
 ```
+
+> **Why `--default-index` instead of `--index`?** The `--default-index` flag replaces PyPI as the primary index, so `--emit-index-url` emits it as the `--index-url` directive in the output. If you use `--index` instead, uv treats it as a supplementary index and PyPI remains the default — `--emit-index-url` then emits PyPI as `--index-url` and your custom index as `--extra-index-url`, which causes hermeto (and pip) to prefer PyPI over AIPCC.
 
 If your requirements pin AIPCC-specific versions with release suffixes like `vllm==0.18.0+rhaiv.4`, you need to tell `uv` to allow pre-releases — it treats the `+rhaiv` local version segment as a pre-release and skips it by default. Prefer `--prerelease=if-necessary` over `--prerelease=allow`:
 
@@ -853,13 +857,11 @@ If your requirements pin AIPCC-specific versions with release suffixes like `vll
 
 Use `--prerelease=allow` only if you specifically need an RC version. See [AIPCC: pre-release versions break multi-arch builds](#aipcc-pre-release-versions-break-multi-arch-builds) for details.
 
-**Critical: `--index-url` must be a pip directive in requirements.txt.** Hermeto reads `--index-url` directives from requirements files to know where to download packages. The `--emit-index-annotation` flag only adds comments (e.g., `# from https://...`), which hermeto ignores — without an actual `--index-url` directive, hermeto defaults to PyPI and fetches `manylinux` wheels or sdists instead of AIPCC's `linux_*` wheels. Add `--index-url` to the top of your compiled requirements.txt:
+**Critical: `--index-url` must be a pip directive in requirements.txt.** Hermeto reads `--index-url` directives from requirements files to know where to download packages. The `--emit-index-annotation` flag only adds comments (e.g., `# from https://...`), which hermeto ignores — without an actual `--index-url` directive, hermeto defaults to PyPI and fetches `manylinux` wheels or sdists instead of AIPCC's `linux_*` wheels. Using `--default-index` with `--emit-index-url` (as shown above) handles this automatically. If you omit `--emit-index-url`, add `--index-url` to the top of your compiled requirements.txt manually:
 
 ```
 --index-url https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9/simple/
 ```
-
-> **`--emit-index-url` pitfall:** `uv pip compile --emit-index-url` does emit pip directives, but it gets the ordering wrong — PyPI is emitted as the primary `--index-url` and the custom index as `--extra-index-url`. This means pip (and hermeto) will prefer PyPI over AIPCC. If you use `--emit-index-url`, you must manually edit the output to remove the PyPI `--index-url` line and promote the AIPCC `--extra-index-url` to `--index-url`. It is simpler to omit `--emit-index-url` and add the `--index-url` line manually.
 
 The `--index-strategy first-index` strategy prefers packages from the first index listed (AIPCC) and is the recommended approach. Some repos use `--index-strategy unsafe-best-match` instead, which picks the highest version across all indexes — this lets AIPCC's patched versions (e.g., `vllm==0.18.0+rhaiv.4`) win over PyPI's unpatched version numbers. However, `unsafe-best-match` can silently pull packages from PyPI when they are missing or lower-versioned on AIPCC, resulting in a mix of sources that is not supported by AIPCC (see the warning above about mixing indexes).
 
@@ -1207,9 +1209,10 @@ AIPCC may publish release candidate versions (e.g., `safetensors==0.8.0rc0`) for
 uv pip compile pyproject.toml \
   --python-platform linux \
   --python-version 3.12 \
-  --index https://console.redhat.com/api/pypi/public-rhai/rhoai/3.5-EA1/cpu-ubi9/simple/ \
+  --default-index https://console.redhat.com/api/pypi/public-rhai/rhoai/3.5-EA1/cpu-ubi9/simple/ \
   --index-strategy first-index \
   --prerelease=if-necessary \
+  --emit-index-url \
   --emit-index-annotation \
   -o requirements.txt
 ```
