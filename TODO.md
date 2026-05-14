@@ -16,6 +16,11 @@
 - [ ] RPM-specific Hermeto gotchas
 - [ ] Leveraging AIPCC Python wheel releases
 
+### AIPCC Guide Improvements
+
+- [ ] Document `-test` index variants (e.g., `cpu-ubi9-test/simple/`) that carry midstream/pre-release builds like `vllm==0.18.0+rhaiv.4` — found in llm-d-kv-cache and llama-stack-provider repos
+- [ ] Clarify the two URL prefixes (`console.redhat.com` vs `packages.redhat.com`) — both work, repos use them interchangeably
+
 ### Refine Hermeto Guide Against Real Repos
 
 Run `/refine-guide-hermeto` against repos with working hermetic builds to find gaps
