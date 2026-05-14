@@ -159,7 +159,9 @@ Go projects are often the simplest case for hermetic builds — the `gomod` pref
 
 **Multi-module repos with Go workspaces:** If your repo contains multiple Go modules (separate `go.mod` files), check whether they're joined by a [`go.work`](https://go.dev/doc/tutorial/workspaces) file. When a `go.work` exists at the workspace root, Go tooling unifies the dependency graph across all workspace modules. A single `{"type": "gomod", "path": "."}` entry pointing at the workspace root is sufficient — hermeto's Go tooling respects the workspace and prefetches dependencies for all included modules.
 
-Without `go.work`, each module needs its own gomod entry:
+**Multi-module repos with `replace` directives:** If the root `go.mod` uses `replace` directives to point at local submodules (e.g., `replace github.com/org/repo/api => ./api`), a single gomod entry at the root is also sufficient — Go resolves the local modules through the replacement path, so hermeto prefetches all external dependencies in one pass. This is common in operator repos where an `api/` submodule is consumed by the main module.
+
+Without `go.work` or `replace` directives, each module needs its own gomod entry:
 
 ```json
 [
@@ -168,7 +170,7 @@ Without `go.work`, each module needs its own gomod entry:
 ]
 ```
 
-Run `find . -name go.mod -not -path '*/vendor/*'` to locate all Go modules. If they share most dependencies, consider adding a `go.work` file to simplify the prefetch config to a single entry.
+Run `find . -name go.mod -not -path '*/vendor/*'` to locate all Go modules. If they share most dependencies, consider adding a `go.work` file or a `replace` directive to simplify the prefetch config to a single entry.
 
 ### npm (JavaScript)
 
