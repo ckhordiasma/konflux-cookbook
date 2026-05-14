@@ -561,6 +561,109 @@ uv pip compile requirements.in \
 
 If you use a custom package index (like AIPCC), add `--emit-index-annotation` so the compiled file records which index each package came from. You can also use `--index-url` in the requirements file or pass `--index` to uv to specify the index.
 
+### Projects with local path dependencies
+
+If your project contains multiple Python packages that depend on each other via `[tool.uv.sources]` path references, hermeto cannot resolve those local paths — it needs flat requirements files listing only external packages with pinned versions. The local packages themselves are installed from source in the Dockerfile, not prefetched.
+
+Suppose your repo has this structure:
+
+```
+python/
+  kserve/pyproject.toml          # standalone
+  storage/pyproject.toml         # depends on kserve
+  autogluonserver/pyproject.toml # depends on kserve and storage
+```
+
+There are several ways to structure the compile, prefetch, and install:
+
+**Combined file** — compile from the top-level package, which pulls in all transitive dependencies through its dependency chain:
+
+```bash
+uv pip compile python/autogluonserver/pyproject.toml \
+  --python-platform linux \
+  --python-version 3.12 \
+  -o python/autogluonserver/requirements.txt
+```
+
+```json
+[
+  {
+    "type": "pip",
+    "path": "python/autogluonserver",
+    "requirements_files": ["requirements.txt"]
+  }
+]
+```
+
+```dockerfile
+RUN pip install -r autogluonserver/requirements.txt
+RUN cd kserve && pip install .
+RUN cd storage && pip install .
+RUN cd autogluonserver && pip install .
+```
+
+**Separate files, one pip entry** — compile each package independently and list all files in a single entry. The `path` must be a common ancestor of all the requirements files:
+
+```bash
+uv pip compile python/kserve/pyproject.toml -o python/kserve/requirements.txt ...
+uv pip compile python/storage/pyproject.toml -o python/storage/requirements.txt ...
+uv pip compile python/autogluonserver/pyproject.toml -o python/autogluonserver/requirements.txt ...
+```
+
+```json
+[
+  {
+    "type": "pip",
+    "path": "python",
+    "requirements_files": [
+      "kserve/requirements.txt",
+      "storage/requirements.txt",
+      "autogluonserver/requirements.txt"
+    ]
+  }
+]
+```
+
+```dockerfile
+RUN pip install \
+    -r kserve/requirements.txt \
+    -r storage/requirements.txt \
+    -r autogluonserver/requirements.txt
+RUN cd kserve && pip install .
+RUN cd storage && pip install .
+RUN cd autogluonserver && pip install .
+```
+
+**Separate pip entries** — one entry per package directory:
+
+```bash
+uv pip compile python/kserve/pyproject.toml -o python/kserve/requirements.txt ...
+uv pip compile python/storage/pyproject.toml -o python/storage/requirements.txt ...
+uv pip compile python/autogluonserver/pyproject.toml -o python/autogluonserver/requirements.txt ...
+```
+
+```json
+[
+  {"type": "pip", "path": "python/kserve", "requirements_files": ["requirements.txt"]},
+  {"type": "pip", "path": "python/storage", "requirements_files": ["requirements.txt"]},
+  {"type": "pip", "path": "python/autogluonserver", "requirements_files": ["requirements.txt"]}
+]
+```
+
+```dockerfile
+RUN pip install \
+    -r kserve/requirements.txt \
+    -r storage/requirements.txt \
+    -r autogluonserver/requirements.txt
+RUN cd kserve && pip install .
+RUN cd storage && pip install .
+RUN cd autogluonserver && pip install .
+```
+
+The combined approach is simplest — a single `uv pip compile` resolves everything together, avoiding version conflicts between files. With separate files, independently compiled requirements may pin different versions of the same transitive dependency, which can cause install conflicts. If using separate files, consider using `--constraint` to keep versions aligned.
+
+With separate files, be aware that `--index-url` in a requirements file applies only to that file's packages. If one file specifies `--index-url` and another doesn't, the second file's packages are fetched from PyPI.
+
 ### Generating requirements-build.txt
 
 Source distributions (sdists) need build backends (hatchling, maturin, pdm-backend, etc.) to compile. Use [pybuild-deps](https://pypi.org/project/pybuild-deps/) to discover these automatically:
