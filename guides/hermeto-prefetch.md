@@ -932,6 +932,8 @@ Once your hermetic build is working:
 - `.hermeto/` -- the prefetched output directory
 - `.hermeto.env` -- the generated environment file
 
+Consider adding these to `.dockerignore` as well to avoid accidentally including the prefetched output (which can be hundreds of MB) in the build context.
+
 **Consider automating lockfile regeneration:**
 - Lockfiles like `requirements.txt`, `requirements-build.txt`, and `rpms.lock.yaml` need to be regenerated when dependencies change. Consider adding a Makefile target, script, or CI job to automate this so the committed lockfiles stay in sync with your project's dependency declarations.
 
