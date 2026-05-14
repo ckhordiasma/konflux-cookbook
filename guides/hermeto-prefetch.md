@@ -989,13 +989,20 @@ Add these to both your `rpms.in.yaml` and the `microdnf install` line in your Do
 
 ### Using permissive mode for mismatched lockfiles
 
-Some Rust extensions ship with out-of-sync `Cargo.lock` / `Cargo.toml`. If `hermeto fetch-deps cargo` fails due to lockfile mismatches:
+Some Rust extensions ship with out-of-sync `Cargo.lock` / `Cargo.toml`. If `hermeto fetch-deps` fails due to lockfile mismatches or other non-fatal inconsistencies:
 
 ```bash
-hermeto --mode permissive fetch-deps cargo
+hermeto --mode permissive fetch-deps hermeto.json
 ```
 
-This regenerates the lockfile instead of erroring out. Note that this reduces reproducibility -- the SBOM may not perfectly reflect what was built.
+This regenerates lockfiles instead of erroring out. Note that this reduces reproducibility -- the SBOM may not perfectly reflect what was built.
+
+In a Konflux pipeline, set the `prefetch-mode` parameter to add `--mode permissive` to the hermeto invocation in the build:
+
+```yaml
+- name: prefetch-mode
+  value: "permissive"
+```
 
 ### Bad hashes from package indexes
 
