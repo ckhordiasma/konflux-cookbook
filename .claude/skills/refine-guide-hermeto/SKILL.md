@@ -25,6 +25,8 @@ Read `guides/hermeto-prefetch.md` (relative to the plugin root) thoroughly befor
 
    Even if the user selects one pipeline, scan the `prefetch-input` of the other push pipelines in the repo. Different components in the same monorepo often reveal patterns (e.g., one component uses a single npm entry while others need multiple entries for sub-project lockfiles, or some components add gomod entries for Go BFFs). These cross-component patterns inform the guide even when only one pipeline is the focus.
 
+   Cross-repo patterns are equally valuable. When running parallel agents, a workaround seen in one repo (e.g., `--prerelease=allow` for AIPCC version suffixes) often applies to all repos using the same ecosystem. The synthesis step should surface these.
+
 3. **Identify the Dockerfile pair**: The pipeline references a `Dockerfile.konflux` (or variant like `Dockerfile.konflux.mlflow`). Ask the user which file was the *original* non-hermetic Dockerfile — it may be in a different directory, use a different naming convention, or use upstream base images. Diff the two and categorize each change:
    - **Hermetic-specific**: offline install flags, prefetch mount paths, workaround scripts for hermetic builds
    - **Konflux-specific but not hermetic**: base image pinning by digest, replacing upstream images with UBI/Red Hat equivalents, hardcoding build args, adding LABEL metadata, changing CGO/linker flags
