@@ -957,6 +957,19 @@ python -m pip install .
 
 You may also need to remove `uv-build` from `requirements-build.txt` since it is no longer needed.
 
+### Python: uv ignores PIP_* environment variables
+
+The pipeline's `cachi2.env` sets `PIP_NO_INDEX` and `PIP_FIND_LINKS` to redirect pip to the prefetched cache. However, [uv does not read `PIP_*` environment variables](https://docs.astral.sh/uv/pip/compatibility/#configuration-files-and-environment-variables) — it has its own equivalents (`UV_FIND_LINKS`, etc.).
+
+If your Dockerfile uses `uv pip install`, pass the prefetch flags explicitly:
+
+```dockerfile
+RUN uv pip install --no-index --find-links "${PIP_FIND_LINKS}" \
+    -r requirements.txt
+```
+
+`PIP_FIND_LINKS` is still set by `cachi2.env` — uv just needs it passed as a CLI argument. This also applies to `uv pip sync` and other `uv pip` subcommands.
+
 ### Cargo: git-sourced dependencies not redirected
 
 Hermeto generates `.cargo/config.toml` to redirect crates.io sources to the local vendor directory, but it does **not** handle git-sourced dependencies. If a crate pulls from a git repo (common with `pyca/cryptography`), Cargo will try to fetch from the network and fail in a hermetic build.
