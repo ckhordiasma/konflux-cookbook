@@ -19,6 +19,8 @@ The `-v "$PWD:$PWD:z"` flag bind-mounts your project directory into the containe
 
 The first step is to create a correct hermeto config. This is a JSON array of package manager objects, each with a `type` field and manager-specific options. In this guide, we save it to a file called `hermeto.json` for local testing, but in your Konflux build pipeline the JSON is typically inlined as a parameter to the prefetch task.
 
+**`path` is relative to the repo root, not to `path-context`.** In a Konflux pipeline, the `path-context` parameter sets the Docker build context directory, and the `dockerfile` parameter locates the Dockerfile relative to that context. The `path` field in the hermeto config is independent — it is always relative to the repo root (where hermeto's `--source` points). For subdirectory builds, these often have the same value (e.g., `path-context: ray-operator` and `"path": "ray-operator"`), but they serve different purposes and can diverge.
+
 Hermeto supports the following package managers -- jump to the one(s) your project uses:
 
 | Type | Language | Section |
