@@ -297,7 +297,28 @@ artifacts:
     checksum: "sha256:4cbbd9243de4c1042d61d9a15db4c43c90ff93b16d78b39481da1c956c8e9671"
 ```
 
-Each artifact requires a `checksum` in `algorithm:hash` format. Downloaded files are stored in `deps/generic/` within the output directory.
+Each artifact requires a `checksum` in `algorithm:hash` format. Downloaded files are stored in `deps/generic/` within the output directory — at build time, the full path is `/cachi2/output/deps/generic/<filename>`.
+
+**Architecture-specific artifacts:** The generic fetcher does not support architecture variables in URLs or filenames — each entry is a literal download. For tools that publish per-arch binaries (e.g., kubectl, oc, helm), add a separate entry for each target architecture and use the Dockerfile's `${TARGETARCH}` variable to select the right file at build time:
+
+```yaml
+artifacts:
+  - download_url: "https://mirror.openshift.com/.../openshift-client-linux-amd64-rhel9-4.21.15.tar.gz"
+    filename: "openshift-client-linux-amd64-rhel9-4.21.15.tar.gz"
+    checksum: "sha256:1fa80bbf..."
+  - download_url: "https://mirror.openshift.com/.../openshift-client-linux-arm64-rhel9-4.21.15.tar.gz"
+    filename: "openshift-client-linux-arm64-rhel9-4.21.15.tar.gz"
+    checksum: "sha256:fb7bccab..."
+```
+
+```dockerfile
+# In a builder stage (ubi-minimal lacks tar):
+RUN tar -xzf /cachi2/output/deps/generic/openshift-client-linux-${TARGETARCH}-rhel9-4.21.15.tar.gz \
+    -C /tmp/ kubectl && \
+    mv /tmp/kubectl /usr/local/bin/kubectl
+```
+
+Hermeto downloads all entries regardless of the current build architecture, so each arch build finds its matching file. Keep the lockfile entries aligned with your pipeline's `build-platforms` — if you add ppc64le or s390x later, you need corresponding entries in `artifacts.lock.yaml`. See [ai-gateway-payload-processing](https://github.com/red-hat-data-services/ai-gateway-payload-processing/blob/rhoai-3.5-ea.1/artifacts.lock.yaml) for a working example.
 
 **Config fields:**
 

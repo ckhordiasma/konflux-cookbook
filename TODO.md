@@ -76,7 +76,7 @@ in the guide. Source: `konflux-central` branch `rhoai-3.5-ea.1` pipelineruns.
 
 #### Fully hermetic — multi-component
 
-- [ ] [ai-gateway-payload-processing](https://github.com/red-hat-data-services/ai-gateway-payload-processing) — 2 components: main build, e2e
+- [x] [ai-gateway-payload-processing](https://github.com/red-hat-data-services/ai-gateway-payload-processing) — gomod + generic, 2 components (main: zero hermetic Dockerfile changes; e2e: generic fetcher for per-arch OCP client tarballs, `${TARGETARCH}` selection)
 - [ ] [argo-workflows](https://github.com/red-hat-data-services/argo-workflows) — 2 components: argoexec, workflowcontroller
 - [ ] [batch-gateway](https://github.com/red-hat-data-services/batch-gateway) — 3 components: apiserver, gc, processor
 - [ ] [data-science-pipelines](https://github.com/red-hat-data-services/data-science-pipelines) — 5 components: api-server-v2, driver, launcher, persistenceagent-v2, scheduledworkflow-v2
