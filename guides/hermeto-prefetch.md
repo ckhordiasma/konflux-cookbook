@@ -777,6 +777,8 @@ uv pip compile pyproject.toml \
   -o requirements.txt
 ```
 
+If your requirements pin AIPCC-specific versions with release suffixes like `vllm==0.18.0+rhaiv.4`, add `--prerelease=allow` — `uv` treats the `+rhaiv` local version segment as a pre-release and skips it by default.
+
 The `--index-strategy first-index` strategy prefers packages from the first index listed (AIPCC) and is the recommended approach. Some repos use `--index-strategy unsafe-best-match` instead, which picks the highest version across all indexes — this lets AIPCC's patched versions (e.g., `vllm==0.18.0+rhaiv.4`) win over PyPI's unpatched version numbers. However, `unsafe-best-match` can silently pull packages from PyPI when they are missing or lower-versioned on AIPCC, resulting in a mix of sources that is not supported by AIPCC (see the warning above about mixing indexes).
 
 **Hermeto config for AIPCC:**
