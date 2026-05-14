@@ -12,6 +12,8 @@ Read `guides/hermeto-prefetch.md` (relative to the plugin root) thoroughly befor
 
 1. **Get repo and branch**: If no repo is specified in the arguments, read `TODO.md` (relative to the cookbook root) and find the next unchecked repo under the "Refine Hermeto Guide Against Real Repos" section. The TODO section header specifies the branch to use. Present the repo and branch to the user for confirmation before proceeding. If the user provides a repo in the arguments, use that instead. Clone the repo at the specified branch into `.claude/repos/<repo-name>-<branch>` (relative to the cookbook root) so it doesn't pollute the project. If the directory already exists from a previous run, ask whether to re-clone or reuse it.
 
+   **Parallel analysis:** When the user asks to analyze multiple repos (e.g., "check all AIPCC repos"), spawn background agents to analyze each repo concurrently. Each agent should perform steps 2–5 independently and return its findings. Keep the main context free for synthesis — do not duplicate the agents' analysis work in the main thread.
+
 2. **Find and parse PipelineRuns**: List `.tekton/*.yaml` files in the cloned repo. If there is only one push pipeline, proceed with it directly. If there are multiple, present them to the user and ask which push pipeline(s) to analyze. For each selected pipeline, extract:
    - `hermetic` flag (true/false)
    - `prefetch-input` (the hermeto config JSON)
