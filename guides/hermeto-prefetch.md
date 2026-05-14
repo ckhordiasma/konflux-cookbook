@@ -862,18 +862,30 @@ context:
     stageName: base
 ```
 
-other ways of specifying context
+The `context.containerfile` field tells the lockfile generator which Dockerfile stage needs these packages, so it can resolve the correct base image repositories. You can select the target stage by `stageName`, `imagePattern`, or `stageNum` — or omit all three when the Dockerfile has a single `FROM`. See the [rpm-lockfile-prototype docs](https://github.com/konflux-ci/rpm-lockfile-prototype) for the full syntax.
 
-```
+```yaml
+# Multi-stage: match by stage name
+context:
+  containerfile:
+    file: "./Dockerfile.konflux"
+    stageName: base
+
+# Match by base image pattern
 context:
   containerfile:
     file: Dockerfiles/controller.Dockerfile.konflux
     imagePattern: ubi9/ubi-minimal
+
+# Single FROM: no stage identifier needed
+context:
+  containerfile:
+    file: Dockerfile.konflux
 ```
 
-The `contentOrigin` section can also be inlined:
+The `contentOrigin` section can also be inlined instead of referencing a repo file. Include CodeReady Builder repos if you need packages like `ninja-build` that aren't in baseos or appstream:
 
-```
+```yaml
 contentOrigin:
   repos:
   - repoid: ubi-9-for-$basearch-baseos-rpms
@@ -884,9 +896,11 @@ contentOrigin:
     baseurl: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/$basearch/appstream/os
   - repoid: ubi-9-for-$basearch-appstream-source-rpms
     baseurl: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/$basearch/appstream/source/SRPMS
+  - repoid: codeready-builder-for-ubi-9-$basearch-rpms
+    baseurl: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/$basearch/codeready-builder/os
+  - repoid: codeready-builder-for-ubi-9-$basearch-source-rpms
+    baseurl: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/$basearch/codeready-builder/source/SRPMS
 ```
-
-The `context.containerfile` field tells the lockfile generator which Dockerfile stage needs these packages, so it can resolve the correct base image repositories.
 
 ### Generating rpms.lock.yaml
 
