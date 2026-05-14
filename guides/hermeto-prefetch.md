@@ -390,6 +390,8 @@ sed -E \
 
 This produces `.hermeto/Dockerfile.konflux` with the env file sourced in every `RUN` command, leaving your original Dockerfile untouched. Use this generated Dockerfile for the local hermetic build in step 4.
 
+> **macOS note:** The `M` (multiline) flag in the sed command above is a GNU extension. macOS ships BSD sed, which does not support it. Install GNU sed with `brew install gnu-sed` and use `gsed` instead of `sed`.
+
 ### 3. Inject configuration files
 
 ```bash
@@ -711,6 +713,24 @@ uv run --python 3.9 --with pybuild-deps pybuild-deps compile \
 
 Match the `--python` version to your target image. This file is needed if any of your dependencies are installed from source distributions (sdists). If a package has no wheel for your target architecture, you'll need this file along with the native toolchain RPMs to build from source -- or use a custom index like AIPCC that has prebuilt wheels (see [Using AIPCC wheels](#using-aipcc-wheels)).
 
+**Project build backends:** If your Dockerfile runs `pip install .` (or `pip install --no-deps .`) to install the project itself, the project's `[build-system].requires` (e.g., `poetry-core`, `hatchling`, `setuptools`) must also be in `requirements-build.txt`. `uv pip compile` resolves runtime dependencies only — it cannot include build system requirements. Check your `pyproject.toml` for the `[build-system]` section and add its `requires` entries to `requirements-build.txt` manually, pinned to exact versions. If using an AIPCC index, include the `--index-url` directive in `requirements-build.txt` as well so hermeto fetches the build backend from the correct index.
+
+Example `requirements-build.txt` for a project that uses poetry-core:
+```
+--index-url https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9/simple/
+poetry-core==1.9.1
+```
+
+Then reference it in your hermeto config:
+```json
+{
+  "type": "pip",
+  "path": ".",
+  "requirements_files": ["requirements.txt"],
+  "requirements_build_files": ["requirements-build.txt"]
+}
+```
+
 ### Using AIPCC wheels
 
 [AIPCC](https://packages.redhat.com/domains/public-rhai/distributions) (AI Platform Core Components) publishes prebuilt Python wheels for all target architectures (x86_64, aarch64, ppc64le, s390x) and accelerator variants (CPU, CUDA, ROCm). Using AIPCC wheels eliminates the need to build packages from source on architectures that lack public PyPI wheels. Several RHOAI components already use AIPCC, including notebooks, mlflow, and mlserver.
@@ -756,6 +776,8 @@ Ask in [#forum-aipcc](https://redhat-internal.slack.com/archives/C07JX0EMKCZ) fo
 
 Start by getting your build working non-hermetically using the AIPCC base image and its pre-configured index. Once your `pip install` succeeds, freeze your dependencies with `uv pip compile` to produce a pinned requirements file that hermeto can prefetch from the AIPCC index.
 
+The `red-hat-data-services/notebooks` repo has already onboarded to AIPCC and shows working combinations of base images and index URLs across RHOAI releases and accelerator variants.
+
 Point `uv pip compile` at the AIPCC index with `--index` and `--index-strategy first-index`. `--emit-index-annotation` is optional but useful -- it annotates each package with the index it was resolved from, making it easy to trace sourcing:
 
 ```bash
@@ -781,22 +803,31 @@ uv pip compile pyproject.toml \
 
 If your requirements pin AIPCC-specific versions with release suffixes like `vllm==0.18.0+rhaiv.4`, add `--prerelease=allow` — `uv` treats the `+rhaiv` local version segment as a pre-release and skips it by default.
 
+**Critical: `--index-url` must be a pip directive in requirements.txt.** Hermeto reads `--index-url` directives from requirements files to know where to download packages. The `--emit-index-annotation` flag only adds comments (e.g., `# from https://...`), which hermeto ignores — without an actual `--index-url` directive, hermeto defaults to PyPI and fetches `manylinux` wheels or sdists instead of AIPCC's `linux_*` wheels. Add `--index-url` to the top of your compiled requirements.txt:
+
+```
+--index-url https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9/simple/
+```
+
+> **`--emit-index-url` pitfall:** `uv pip compile --emit-index-url` does emit pip directives, but it gets the ordering wrong — PyPI is emitted as the primary `--index-url` and the custom index as `--extra-index-url`. This means pip (and hermeto) will prefer PyPI over AIPCC. If you use `--emit-index-url`, you must manually edit the output to remove the PyPI `--index-url` line and promote the AIPCC `--extra-index-url` to `--index-url`. It is simpler to omit `--emit-index-url` and add the `--index-url` line manually.
+
 The `--index-strategy first-index` strategy prefers packages from the first index listed (AIPCC) and is the recommended approach. Some repos use `--index-strategy unsafe-best-match` instead, which picks the highest version across all indexes — this lets AIPCC's patched versions (e.g., `vllm==0.18.0+rhaiv.4`) win over PyPI's unpatched version numbers. However, `unsafe-best-match` can silently pull packages from PyPI when they are missing or lower-versioned on AIPCC, resulting in a mix of sources that is not supported by AIPCC (see the warning above about mixing indexes).
 
 **Hermeto config for AIPCC:**
 
-Since AIPCC only publishes wheels (no sdists), you must set `binary` in your hermeto config so hermeto knows to fetch wheels. Use `":all:"` to accept wheels for all packages:
+Since AIPCC only publishes wheels (no sdists), you must set `binary` in your hermeto config so hermeto knows to fetch wheels. List the specific architectures you build for rather than using `":all:"`:
 
 ```json
 {
   "type": "pip",
   "path": ".",
   "requirements_files": ["requirements.txt"],
-  "binary": { "arch": ":all:" }
+  "requirements_build_files": ["requirements-build.txt"],
+  "binary": { "arch": "x86_64,aarch64,ppc64le,s390x" }
 }
 ```
 
-Using `":all:"` tells hermeto to prefer wheels for any architecture but fall back to sdists. Since AIPCC only publishes wheels (no sdists), `":all:"` works — hermeto fetches whatever wheel is available for each architecture. You can also list specific architectures to match your `build-platforms` (e.g., `"x86_64,aarch64"` if you only build for two arches), which avoids downloading wheels for architectures you don't target.
+> **Avoid `":all:"` for AIPCC.** The `":all:"` shorthand fetches wheels for every platform variant — including i686 and musllinux — which inflates download size and time. List only the architectures your Konflux pipeline actually builds for (typically `x86_64,aarch64,ppc64le,s390x`).
 
 Once the AIPCC base image is in place, no additional hermeto-specific Dockerfile modifications are needed. The pipeline's automatic `cachi2.env` injection sets `PIP_NO_INDEX=true` and `PIP_FIND_LINKS` to redirect pip to the prefetched cache. You will still need a pinned `requirements.txt` with the AIPCC `--index-url` annotation so hermeto knows where to download from, but the Dockerfile.konflux itself needs no manual env sourcing or prefetch mount paths. The Dockerfile's `pip install` commands do not need to reference the requirements file — they can install packages by name (e.g., `pip install mlserver` or `pip install pyspark==${VERSION}`). The requirements file tells hermeto what to prefetch; the pipeline's `PIP_FIND_LINKS` ensures pip finds the prefetched wheels regardless of how the install is invoked.
 
@@ -1102,6 +1133,18 @@ perl -0777 -pi -e "s/ \\\\\n    --hash=sha256:${HASH}//g" requirements.txt
 ```
 
 If you have a regeneration script (see [Alternative: `uv export` from `uv.lock`](#alternative-uv-export-from-uvlock)), add this step after the export so it runs automatically.
+
+### AIPCC: duplicate wheels from build numbers
+
+AIPCC publishes wheels with build numbers in the filename (e.g., `torch-2.10.0-2-cp312-cp312-linux_x86_64.whl` where `-2` is a build tag). When AIPCC rebuilds a package, the old build remains on the index alongside the new one. Hermeto fetches all available builds for a given version, which can significantly inflate the prefetch size.
+
+**Workaround:** Add `--generate-hashes` to your `uv pip compile` command. The hashes pin to specific wheel files, so hermeto downloads only the exact builds your requirements reference rather than every build of that version. This also improves reproducibility.
+
+### macOS: sed command for Dockerfile injection
+
+The sed command in [step 2](#2-generate-the-environment-file-and-modify-the-dockerfile) uses the `M` (multiline) flag, which is a GNU extension. macOS ships BSD sed, which does not support it.
+
+**Fix:** Install GNU sed with `brew install gnu-sed` and use `gsed` instead of `sed` in the command.
 
 ### Organizing workarounds
 
