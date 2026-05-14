@@ -25,7 +25,7 @@ in the guide. Source: `konflux-central` branch `rhoai-3.5-ea.1` pipelineruns.
 
 - [x] [odh-dashboard](https://github.com/red-hat-data-services/odh-dashboard) — `odh-dashboard` component
 - [x] [data-science-pipelines-operator](https://github.com/red-hat-data-services/data-science-pipelines-operator) — gomod only, zero hermetic Dockerfile changes
-- [ ] [eval-hub](https://github.com/red-hat-data-services/eval-hub)
+- [x] [eval-hub](https://github.com/red-hat-data-services/eval-hub) — gomod only, zero hermetic Dockerfile changes
 - [ ] [kserve-autogluon-server](https://github.com/red-hat-data-services/kserve-autogluon-server)
 - [ ] [kube-auth-proxy](https://github.com/red-hat-data-services/kube-auth-proxy)
 - [ ] [kube-rbac-proxy](https://github.com/red-hat-data-services/kube-rbac-proxy)

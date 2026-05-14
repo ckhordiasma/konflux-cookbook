@@ -295,10 +295,10 @@ Each artifact requires a `checksum` in `algorithm:hash` format. Downloaded files
 
 ### Create a Dockerfile.konflux
 
-Start by copying your existing Dockerfile to `Dockerfile.konflux`. This is the copy you will modify for hermetic builds -- keep the original Dockerfile untouched so the project's existing non-hermetic build continues to work.
+Start by copying your existing Dockerfile (or `Containerfile`, if your project uses the Podman naming convention) to `Dockerfile.konflux`. This is the copy you will modify for hermetic builds -- keep the original untouched so the project's existing non-hermetic build continues to work.
 
 ```bash
-cp Dockerfile Dockerfile.konflux
+cp Dockerfile Dockerfile.konflux    # or: cp Containerfile Dockerfile.konflux
 ```
 
 All subsequent changes in this guide (sourcing the hermeto env file, adding system packages to support hermetic installs, etc.) should be made in `Dockerfile.konflux`.
@@ -312,6 +312,8 @@ The Dockerfile is the source of truth for what the build needs. Before writing a
 - **Direct downloads** -- curl, wget, git clone, or any script that fetches from the internet. These can often be handled with the [generic fetcher](#generic).
 
 Each network access point maps to a hermeto package manager config (see [Configuring hermeto.json](#configuring-hermetojson)) or needs a manual workaround.
+
+Only network access in the Dockerfile matters. A repo may contain lockfiles (e.g., `package-lock.json` for a documentation site, or `requirements.txt` for a test suite) that are never referenced by the container build -- these do not need hermeto entries. The Dockerfile is your guide, not the repo's file listing.
 
 Multiple commands using the same package manager still map to a single hermeto entry. For example, a Dockerfile might run `npm ci` for a full install during the build stage and then `npm install --omit=dev` to prune to production dependencies. Both draw from the same prefetched cache -- hermeto prefetches everything in the lockfile, and each `npm` command finds what it needs regardless of flags like `--omit=dev` or `--ignore-scripts`.
 
