@@ -717,6 +717,8 @@ Match the `--python` version to your target image. This file is needed if any of
 
 > **Note:** Some components (e.g., mlflow) temporarily prefetch a small number of packages from public PyPI alongside AIPCC -- typically pure-Python packages or compiled extensions that don't touch the accelerator stack (e.g., `psycopg2`). This can work as a short-term workaround, but the proper fix is to get the missing packages added to AIPCC so everything comes from a single, supported index.
 
+This applies to any dependency source, not just PyPI. If your project installs packages from git URLs (e.g., `git+https://github.com/org/repo@tag`), those packages must also be published to the AIPCC index. Git-sourced dependencies are incompatible with pip's hash-checking mode, so mixing them with hashed AIPCC packages in the same requirements file does not work. The fix is to get the midstream package onboarded to AIPCC — for example, the llama-stack-provider team had garak published as `garak==0.14.1+rhaiv.8` on the AIPCC index rather than installing it from a git URL.
+
 AIPCC provides separate indexes per RHOAI release and accelerator variant. Browse available indexes at [packages.redhat.com](https://packages.redhat.com/domains/public-rhai/distributions). For RHOAI 3.4:
 
 | Variant | Index URL | Base Image |
