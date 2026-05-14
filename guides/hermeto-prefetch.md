@@ -372,6 +372,50 @@ podman build . \
 - The RPM `repos.d` volume mount is only needed if you use the RPM prefetcher. Omit it if you don't prefetch RPMs.
 - On Apple Silicon Macs, `uname -m` returns `arm64` but the RPM repo path uses the Linux name `aarch64`. Replace `$(uname -m)` with `aarch64` explicitly.
 
+## Testing on Remote Architectures
+
+Konflux builds run on x86_64, aarch64, ppc64le, and s390x. Your local machine is only one of these, so to validate your hermetic build on other architectures you can run config and prefetch locally, then sync to a remote host for just the podman build. Hermeto downloads dependencies for all architectures declared in your config, so prefetch doesn't need to run on the target host. Ideally, `podman` is the only dependency needed on the remote host.
+
+Before syncing, make sure the following have been generated locally (see [Building with Prefetched Dependencies](#building-with-prefetched-dependencies)):
+
+- `.hermeto/` -- the prefetched output directory (from `fetch-deps`)
+- `.hermeto.env` -- the environment file (from `generate-env`)
+- `.hermeto/Dockerfile.konflux` -- the modified Dockerfile with env injection (from the `sed` command)
+- Any injected config files (from `inject-files`)
+
+Sync the project to the remote host:
+
+```bash
+rsync -az --delete \
+  --exclude '__pycache__' \
+  --exclude '*.pyc' \
+  . user@remote-host:/tmp/myproject
+```
+
+Then SSH in and run the `podman build` from [step 4](#4-test-locally-with-a-hermetic-build). The remote host only needs `podman` -- it doesn't need hermeto, uv, or any other tooling.
+
+For projects where you test on remote hosts frequently, a wrapper script avoids repeating these steps:
+
+```bash
+#!/bin/bash
+set -euo pipefail
+
+HOST="${1:?Usage: $0 <user@host>}"
+REMOTE_DIR="/tmp/myproject"
+
+ssh "$HOST" 'sudo dnf install -y rsync podman'
+
+rsync -az --delete \
+  --exclude '__pycache__' \
+  --exclude '*.pyc' \
+  . "$HOST:$REMOTE_DIR"
+
+# Drop into a shell on the remote host to run the build
+ssh -t "$HOST" "cd $REMOTE_DIR && echo 'Ready on \$(uname -m).' && exec bash -l"
+```
+
+If you're using the cookbook Makefiles (see [Makefile-Based Workflow](#makefile-based-workflow)), the local prefetch and Dockerfile generation steps can be replaced with `make -f Makefile.hermeto-build prefetch dockerfile` before syncing.
+
 ## Makefile-Based Workflow
 
 For iterative development, Makefiles let you run individual stages without re-running everything from scratch. The cookbook includes two parameterized Makefiles that split the workflow into config and build:
@@ -441,24 +485,6 @@ make -f Makefile.hermeto-build clean            # remove .hermeto/ and .hermeto.
 ```
 
 Running `make -f Makefile.hermeto-config` with no target runs all config stages end-to-end (pip-compile, build-deps, hermeto-config). Running `make -f Makefile.hermeto-build build` runs the prefetch, Dockerfile transform, and podman build.
-
-### Testing on Remote Architectures
-
-To test hermetic builds on a different CPU architecture (e.g., x86_64 from an ARM Mac), run the config and prefetch locally, then sync to a remote host for just the build:
-
-```bash
-# On your local machine: generate config and prefetch
-make -f Makefile.hermeto-config
-make -f Makefile.hermeto-build prefetch dockerfile
-
-# Sync to a remote host
-rsync -az --delete . user@remote-host:/tmp/myproject
-
-# On the remote host: only podman is needed, not uv
-ssh -t user@remote-host 'cd /tmp/myproject && make -f Makefile.hermeto-build build'
-```
-
-The build Makefile only requires `podman` -- it doesn't need `uv` or other tools that are only used during the config stage. This makes it easy to test on minimal hosts.
 
 ## Dockerfile Reference
 
