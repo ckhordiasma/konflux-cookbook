@@ -997,6 +997,19 @@ hermeto --mode permissive fetch-deps cargo
 
 This regenerates the lockfile instead of erroring out. Note that this reduces reproducibility -- the SBOM may not perfectly reflect what was built.
 
+### Bad hashes from package indexes
+
+Package indexes occasionally publish incorrect hashes for a package version. When this happens, `uv pip compile` or `uv export` records the bad hash in your requirements file, and hermeto or pip fails at install time because the downloaded file doesn't match.
+
+**Workaround:** Strip the bad hash from the generated requirements file as a post-processing step. File a ticket with the index maintainer to get the hash corrected upstream, and remove the workaround once fixed. For example, using `perl` to remove a specific hash:
+
+```bash
+HASH="f2839f9c2c7e2dffc1bc5929a510e14ce0a946be9365fd1219e7ef342dae14f4"
+perl -0777 -pi -e "s/ \\\\\n    --hash=sha256:${HASH}//g" requirements.txt
+```
+
+If you have a regeneration script (see [Alternative: `uv export` from `uv.lock`](#alternative-uv-export-from-uvlock)), add this step after the export so it runs automatically.
+
 ### Organizing workarounds
 
 If you have multiple hermetic build fixes, collect them in a shell script (e.g., `hermetic_fixes.sh`) rather than bloating the Dockerfile. This makes it clear which steps are temporary workarounds vs. permanent build logic:
