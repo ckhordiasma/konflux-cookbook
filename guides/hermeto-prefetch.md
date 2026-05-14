@@ -330,7 +330,7 @@ The Dockerfile is the source of truth for what the build needs. Before writing a
 
 - **Package manager installs** -- pip, cargo, npm, go, yarn, bundler
 - **System package installs** -- microdnf, dnf, yum
-- **Direct downloads** -- curl, wget, git clone, or any script that fetches from the internet. These can often be handled with the [generic fetcher](#generic). Alternatively, you can eliminate the download entirely: copy the binary from an existing, trusted container image via a multi-stage `COPY --from=` (e.g., kubectl from `ose-cli-rhel9`), or choose a base image that already includes the tools you need. You can also add the tool's source as a git submodule and build it from source with its own prefetch entry, though this adds complexity — you are now building two things hermetically instead of one.
+- **Direct downloads** -- curl, wget, git clone, or any script that fetches from the internet. These can often be handled with the [generic fetcher](#generic). Alternatively, you can eliminate the download entirely: copy the binary from an existing, trusted container image via a multi-stage `COPY --from=` (e.g., kubectl from `ose-cli-rhel9`), choose a base image that already includes the tools you need, add the tool's source as a git submodule and build it from source with its own prefetch entry, or pre-commit the assets to the repo via a separate CI workflow (e.g., a GitHub Action that clones upstream repos, downloads artifacts, or runs an external build system like PNC, then commits the results so the Dockerfile can simply `COPY` them).
 
 > **Red Hat note:** Generic fetcher entries require a policy exception for productized builds. Prefer the alternatives above (multi-stage copy, base image selection, building from source) when possible.
 
