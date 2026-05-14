@@ -633,7 +633,7 @@ Since AIPCC only publishes wheels (no sdists), you must set `binary` in your her
 }
 ```
 
-Like Go projects with `gomod`, AIPCC-only pip projects often need zero hermetic-specific Dockerfile changes. The pipeline's automatic `cachi2.env` injection sets `PIP_NO_INDEX=true` and `PIP_FIND_LINKS` to redirect pip to the prefetched cache. You will still need a pinned `requirements.txt` with the AIPCC `--index-url` annotation so hermeto knows where to download from, but the Dockerfile.konflux itself typically requires only Konflux-general changes (base image, labels) — no manual env sourcing or mount paths.
+Once the AIPCC base image is in place, no additional hermeto-specific Dockerfile modifications are needed. The pipeline's automatic `cachi2.env` injection sets `PIP_NO_INDEX=true` and `PIP_FIND_LINKS` to redirect pip to the prefetched cache. You will still need a pinned `requirements.txt` with the AIPCC `--index-url` annotation so hermeto knows where to download from, but the Dockerfile.konflux itself needs no manual env sourcing or prefetch mount paths.
 
 **Multi-variant builds:**
 
