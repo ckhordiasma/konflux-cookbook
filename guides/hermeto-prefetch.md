@@ -315,6 +315,8 @@ Alternatively, you can configure all managers in `hermeto.json` first, get `fetc
 
 Once you have a correct `hermeto.json` (see [Configuring hermeto.json](#configuring-hermetojson)), these steps download the dependencies and set up your build to use them offline.
 
+> **Do not commit `. /cachi2/cachi2.env` sourcing into your Dockerfile.konflux.** The Konflux build pipeline [automatically injects](https://github.com/konflux-ci/build-definitions/blob/44ffba6bd5e8a3da0511b13677b3a0982ae6722e/task/buildah-oci-ta/0.8/buildah-oci-ta.yaml#L749-L754) `. /cachi2/cachi2.env &&` before every `RUN` instruction at build time using a sed transform. The generate-env and sed steps below replicate this behavior for **local testing** -- use them to produce a temporary modified Dockerfile for `podman build`, but do not check those changes into your committed Dockerfile.konflux.
+
 ### 1. Fetch dependencies
 
 This is where hermeto actually downloads all the dependencies defined by your config into a local output directory:
@@ -496,7 +498,7 @@ Running `make -f Makefile.hermeto-config` with no target runs all config stages 
 
 ## Dockerfile Reference
 
-For reference, here is what a Dockerfile looks like with the env file sourced manually (this is what the sed command in [step 2](#2-generate-the-environment-file-and-modify-the-dockerfile) automates):
+For reference, here is what the Dockerfile looks like *after* the pipeline's automatic sed injection. This is not what you commit -- it shows the transformed version that runs at build time (and what the local testing sed command in [step 2](#2-generate-the-environment-file-and-modify-the-dockerfile) produces):
 
 ```dockerfile
 FROM registry.access.redhat.com/ubi9/python-312-minimal AS base
