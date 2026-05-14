@@ -633,6 +633,8 @@ Since AIPCC only publishes wheels (no sdists), you must set `binary` in your her
 }
 ```
 
+Like Go projects with `gomod`, AIPCC-only pip projects often need zero hermetic-specific Dockerfile changes. The pipeline's automatic `cachi2.env` injection sets `PIP_NO_INDEX=true` and `PIP_FIND_LINKS` to redirect pip to the prefetched cache. You will still need a pinned `requirements.txt` with the AIPCC `--index-url` annotation so hermeto knows where to download from, but the Dockerfile.konflux itself typically requires only Konflux-general changes (base image, labels) — no manual env sourcing or mount paths.
+
 **Multi-variant builds:**
 
 If your component builds for multiple accelerators (CPU, CUDA, ROCm), you may want to maintain separate requirements files per variant (e.g., `requirements.cpu.txt`, `requirements.cuda.txt`) and use build-args to select the right one at build time. The notebooks component does this with a `build-args/konflux.{variant}.conf` file that sets the index URL and base image for each variant (e.g., [CPU config](https://github.com/red-hat-data-services/notebooks/blob/1e60d9cb49ec28740e89ac8ce5ded897f86f775b/jupyter/datascience/ubi9-python-3.12/build-args/konflux.cpu.conf), [CUDA config](https://github.com/red-hat-data-services/notebooks/blob/1e60d9cb49ec28740e89ac8ce5ded897f86f775b/jupyter/pytorch/ubi9-python-3.12/build-args/konflux.cuda.conf)).
