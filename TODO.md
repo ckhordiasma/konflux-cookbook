@@ -19,6 +19,7 @@
 ### Repo Cleanup
 
 - [ ] [llama-stack-provider-trustyai-garak](https://github.com/red-hat-data-services/llama-stack-provider-trustyai-garak) — remove vestigial dummy Cargo project (`Cargo.toml`, `Cargo.lock`, `.konflux/main.rs`) and per-arch pip workaround files (`.konflux/s390x`, `.konflux/ppc64le`, `.konflux/prep-hermeto.sh`). These were workarounds for hermeto bugs ([#1205](https://github.com/hermetoproject/hermeto/issues/1205)) that are no longer used now that AIPCC provides prebuilt wheels.
+- [ ] [distributed-workloads](https://github.com/red-hat-data-services/distributed-workloads) — `[tool.uv]` config (index-url, index-strategy, environments) is in `pyproject.toml`, which may cause merge conflicts when syncing from upstream. Consider moving these settings to CLI flags in a compile script or Makefile instead.
 
 ### AIPCC Guide Improvements
 

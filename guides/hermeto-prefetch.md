@@ -916,6 +916,24 @@ contentOrigin:
     baseurl: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/$basearch/codeready-builder/source/SRPMS
 ```
 
+**EPEL packages:**
+
+If you need packages from EPEL, add the EPEL repo inline in `rpms.in.yaml` with `gpgcheck: 0`:
+
+```yaml
+contentOrigin:
+  repos:
+  - repoid: ubi-9-for-$basearch-baseos-rpms
+    baseurl: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/$basearch/baseos/os
+  - repoid: ubi-9-for-$basearch-appstream-rpms
+    baseurl: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/$basearch/appstream/os
+  - repoid: epel-9
+    metalink: https://mirrors.fedoraproject.org/metalink?repo=epel-9&arch=$basearch
+    gpgcheck: 0
+```
+
+> **Red Hat note:** EPEL packages cannot be used in productized builds without a ProdSec exception. Check with your product security team before adding EPEL dependencies to a shipped image.
+
 ### Generating rpms.lock.yaml
 
 Use [rpm-lockfile-prototype](https://github.com/konflux-ci/rpm-lockfile-prototype) to resolve and lock RPM versions:
