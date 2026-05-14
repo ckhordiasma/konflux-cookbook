@@ -32,7 +32,7 @@ Read `guides/hermeto-prefetch.md` (relative to the plugin root) thoroughly befor
 
    If the Dockerfile.konflux is a complete rewrite rather than a modification (e.g., switching from a Debian base to an AIPCC UBI9 image), note this as a structural finding and compare the two builds' approaches rather than diffing line by line. A diff produces noise when the base image ecosystem, package manager, and dependency strategy are all different.
 
-   Finding **zero hermetic-specific changes** is a valid and important result — it means the Konflux pipeline's automatic cachi2.env injection and volume mounts were sufficient without any manual Dockerfile modifications. Report this explicitly, since it indicates the guide may overstate the amount of Dockerfile work needed for simple cases.
+   Finding **zero hermetic-specific changes** is a valid and important result — it means the Konflux pipeline's automatic cachi2.env injection and volume mounts were sufficient without any manual Dockerfile modifications. Report this explicitly. When analyzing multiple repos, track the zero-change count (e.g., "4/6 repos needed no hermetic Dockerfile changes") — if most repos need no changes, that's a signal the guide should set that expectation upfront.
 
    Note: Categorize "Konflux-specific but not hermetic" findings separately. These belong in a Dockerfile.konflux best practices guide, not in the hermeto prefetch guide. Track them as TODO items rather than proposing edits to `guides/hermeto-prefetch.md`.
 
