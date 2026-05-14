@@ -169,6 +169,19 @@ Requires `package.json` and `package-lock.json`.
 {"type": "npm", "path": "."}
 ```
 
+**Monorepos with npm workspaces:** If your project uses [npm workspaces](https://docs.npmjs.com/cli/v10/using-npm/workspaces), a single entry pointing at the workspace root is sufficient -- npm workspaces share a single root `package-lock.json` that covers all workspace packages.
+
+**Monorepos with independent sub-projects:** Hermeto does not auto-detect lockfiles. If your monorepo contains sub-projects with their own `package-lock.json` outside the workspace tree (common when packages have a separately-installed `frontend/` directory), each one needs its own npm entry:
+
+```json
+[
+  {"type": "npm", "path": "."},
+  {"type": "npm", "path": "packages/mymod/frontend"}
+]
+```
+
+Run `find . -name package-lock.json -not -path '*/node_modules/*'` to find all lockfiles that may need entries.
+
 ### yarn (JavaScript)
 
 [Hermeto yarn docs](https://hermetoproject.github.io/hermeto/latest/yarn/)
