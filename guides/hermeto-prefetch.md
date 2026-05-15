@@ -859,14 +859,14 @@ uv pip compile pyproject.toml \
 
 > **Why `--default-index` instead of `--index`?** The `--default-index` flag replaces PyPI as the primary index, so `--emit-index-url` emits it as the `--index-url` directive in the output. If you use `--index` instead, uv treats it as a supplementary index and PyPI remains the default — `--emit-index-url` then emits PyPI as `--index-url` and your custom index as `--extra-index-url`, which causes hermeto (and pip) to prefer PyPI over AIPCC.
 
-If your requirements pin AIPCC-specific versions with local version segments like `vllm==0.18.0+rhaiv.4`, you need to tell `uv` to allow them — uv skips versions with local segments by default. Prefer `--prerelease=if-necessary` over `--prerelease=allow`:
+If your constraints explicitly pin AIPCC-specific versions with local version segments like `vllm==0.18.0+rhaiv.4`, uv will skip them by default. Add `--prerelease=if-necessary` to allow them. Prefer this over `--prerelease=allow`:
 
 - **`--prerelease=if-necessary`** — only uses a pre-release when no stable version satisfies the constraint. This is safer for multi-arch builds because it avoids pulling release candidates that may only have wheels for a subset of architectures.
 - **`--prerelease=allow`** — allows pre-releases for all packages, which can pull RC versions (e.g., `safetensors==0.8.0rc0`) that have wheels on some architectures but not others, causing builds to fail on the missing arch.
 
 Use `--prerelease=allow` only if you specifically need an RC version. See [AIPCC: pre-release versions break multi-arch builds](#aipcc-pre-release-versions-break-multi-arch-builds) for details.
 
-**Use `--no-strip-markers` to preserve platform-specific markers.** Some dependencies are only needed on certain architectures — for example, `triton` is a torch dependency only on `platform_machine != "s390x"`. By default, `uv pip compile` strips environment markers from the output, producing a flat list like `triton==3.6.0` that pip will try to install everywhere. Adding `--no-strip-markers` preserves the markers in the output (e.g., `triton==3.6.0 ; platform_machine != 's390x'`), so pip skips arch-specific packages on architectures that don't need them.
+**Consider `--no-strip-markers`** if your dependencies include platform-specific packages. Some dependencies are only needed on certain architectures — for example, `triton` is a torch dependency only on `platform_machine != "s390x"`. By default, `uv pip compile` strips environment markers from the output, producing a flat list like `triton==3.6.0` that pip will try to install everywhere. Adding `--no-strip-markers` preserves the markers in the output (e.g., `triton==3.6.0 ; platform_machine != 's390x'`), so pip skips arch-specific packages on architectures that don't need them.
 
 **Verifying multi-arch compatibility:**
 
@@ -919,7 +919,7 @@ Since AIPCC only publishes wheels (no sdists), you must set `binary` in your her
 }
 ```
 
-> **Avoid `":all:"` for AIPCC.** The `":all:"` shorthand fetches wheels for every platform variant — including i686 and musllinux — which inflates download size and time. List only the architectures your Konflux pipeline actually builds for (typically `x86_64,aarch64,ppc64le,s390x`).
+> **`":all:"` works but downloads unnecessary platform variants** (i686, musllinux), which inflates download size and time. Listing only the architectures your Konflux pipeline actually builds for (typically `x86_64,aarch64,ppc64le,s390x`) keeps prefetch faster and smaller.
 
 Once the AIPCC base image is in place, no additional hermeto-specific Dockerfile modifications are needed. The pipeline's automatic `cachi2.env` injection sets `PIP_NO_INDEX=true` and `PIP_FIND_LINKS` to redirect pip to the prefetched cache. You will still need a pinned `requirements.txt` with the AIPCC `--index-url` annotation so hermeto knows where to download from, but the Dockerfile.konflux itself needs no manual env sourcing or prefetch mount paths. The Dockerfile's `pip install` commands do not need to reference the requirements file — they can install packages by name (e.g., `pip install mlserver` or `pip install pyspark==${VERSION}`). The requirements file tells hermeto what to prefetch; the pipeline's `PIP_FIND_LINKS` ensures pip finds the prefetched wheels regardless of how the install is invoked.
 
@@ -1214,7 +1214,7 @@ Python packages with C or Rust extensions often need development headers at buil
 | `gcc`, `g++`, `make` | General native compilation |
 | `cargo` | Rust extensions via maturin |
 
-Add these to both your `rpms.in.yaml` and the `microdnf install` line in your Dockerfile. If you only add them to the Dockerfile without declaring them in `rpms.in.yaml`, the hermetic build will fail because `microdnf` has no network access.
+If you prefetch RPMs, these packages need to appear in both `rpms.in.yaml` (so they're prefetched) and the `dnf install` line in your Dockerfile (so they're installed). Missing one side or the other causes either a prefetch gap or a network failure.
 
 ### Using permissive mode for mismatched lockfiles
 
@@ -1288,11 +1288,9 @@ Before adding prefetch entries for every network access point in your Dockerfile
 
 ### Organizing workarounds
 
-If you have multiple hermetic build fixes, collect them in a shell script (e.g., `hermetic_fixes.sh`) rather than bloating the Dockerfile. This makes it clear which steps are temporary workarounds vs. permanent build logic:
+If you have multiple hermetic build fixes, collect them in a shell script (e.g., `hermetic_fixes.sh`) rather than bloating the Dockerfile. This makes it clear which steps are temporary workarounds vs. permanent build logic, and makes it easier to remove them once the root cause is fixed upstream:
 
 ```dockerfile
 COPY ./hermetic_fixes.sh ./
 RUN ./hermetic_fixes.sh
 ```
-
-Document each fix with the root cause and the condition under which it can be removed.
