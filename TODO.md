@@ -4,17 +4,7 @@
 
 - [ ] Getting a local build working on x86 or arm before moving to Konflux
 
-## Multi-Arch
-
-- [x] Provisioning Power/Z architecture hardware on Beaker
-
 ## Hermetic Builds with Hermeto
-
-- [x] Using Hermeto locally to prefetch dependencies, and modifying your build to consume prefetched dependencies
-- [x] Running Hermeto as a container (for environments where you can't install it directly)
-- [x] Python-specific Hermeto gotchas
-- [x] RPM-specific Hermeto gotchas
-- [x] Leveraging AIPCC Python wheel releases
 
 ### Investigation
 
@@ -30,72 +20,13 @@
 - [ ] Document `-test` index variants (e.g., `cpu-ubi9-test/simple/`) that carry midstream/pre-release builds like `vllm==0.18.0+rhaiv.4` — found in llm-d-kv-cache and llama-stack-provider repos
 - [ ] Clarify the two URL prefixes (`console.redhat.com` vs `packages.redhat.com`) — both work, repos use them interchangeably
 
-#### Repos currently leveraging AIPCC wheels (rhoai-3.5-ea.1)
-
-- [distributed-workloads](https://github.com/red-hat-data-services/distributed-workloads) — CPU/CUDA/ROCm training images (th06-cpu, th06-cuda, th06-rocm)
-- [kserve-autogluon-server](https://github.com/red-hat-data-services/kserve-autogluon-server) — CPU index for autogluon serving
-- [llama-stack-provider-trustyai-garak](https://github.com/red-hat-data-services/llama-stack-provider-trustyai-garak) — CPU base image + AIPCC index
-- [llm-d-kv-cache](https://github.com/red-hat-data-services/llm-d-kv-cache) — CPU base image + AIPCC index (uds_tokenizer service)
-- [mlflow](https://github.com/red-hat-data-services/mlflow) — mixed AIPCC + PyPI requirements
-- [mlserver](https://github.com/red-hat-data-services/mlserver) — CPU requirements
-- [notebooks](https://github.com/red-hat-data-services/notebooks) — CPU/CUDA/ROCm base images and workbenches
-- [pipelines-components](https://github.com/red-hat-data-services/pipelines-components) — automl + autorag components
-- [spark-operator](https://github.com/red-hat-data-services/spark-operator) — CPU index for Spark dependencies
-
-### Refine Hermeto Guide Against Real Repos
-
-Run `/refine-guide-hermeto` against repos with working hermetic builds to find gaps
-in the guide. Source: `konflux-central` branch `rhoai-3.5-ea.1` pipelineruns.
-
-#### Fully hermetic — single component
-
-- [x] [odh-dashboard](https://github.com/red-hat-data-services/odh-dashboard) — `odh-dashboard` component
-- [x] [data-science-pipelines-operator](https://github.com/red-hat-data-services/data-science-pipelines-operator) — gomod only, zero hermetic Dockerfile changes
-- [x] [eval-hub](https://github.com/red-hat-data-services/eval-hub) — gomod only, zero hermetic Dockerfile changes
-- [x] [kserve-autogluon-server](https://github.com/red-hat-data-services/kserve-autogluon-server) — pip/AIPCC only, zero hermetic Dockerfile changes, local path deps pattern
-- [x] [kube-auth-proxy](https://github.com/red-hat-data-services/kube-auth-proxy) — gomod only, zero hermetic Dockerfile changes, Go workspace (`go.work`) covers multi-module deps
-- [x] [kube-rbac-proxy](https://github.com/red-hat-data-services/kube-rbac-proxy) — gomod only, zero hermetic Dockerfile changes, `go mod vendor` + `-mod=vendor` pattern works with prefetched cache
-- [x] [kuberay](https://github.com/red-hat-data-services/kuberay) — gomod only, zero hermetic Dockerfile changes, `path` matches `path-context` for subdirectory builds
-- [x] [llama-stack-provider-trustyai-garak](https://github.com/red-hat-data-services/llama-stack-provider-trustyai-garak) — pip/AIPCC + RPMs, zero hermetic Dockerfile changes, git dep migrated to AIPCC, permissive mode, CodeReady Builder repos
-- [x] [llm-d-kv-cache](https://github.com/red-hat-data-services/llm-d-kv-cache) — pip/AIPCC only, zero hermetic Dockerfile changes, `uv export` workflow, bad hash workaround
-- [x] [mlflow](https://github.com/red-hat-data-services/mlflow) — pip/AIPCC + PyPI + yarn + RPMs, mixed-source pattern with `--no-deps`, stock UBI9 (no AIPCC base image), multi-arch compile.py, RHOAI push `hermetic: false` pending yarn support
-- [x] [mlflow-operator](https://github.com/red-hat-data-services/mlflow-operator) — gomod only, zero hermetic Dockerfile changes, `replace` directive unifies multi-module (`api/`) under single gomod entry
-- [x] [mlserver](https://github.com/red-hat-data-services/mlserver) — pip/AIPCC only, zero hermetic Dockerfile changes, installs by package name not `-r requirements.txt`
-- [x] [model-metadata-collection](https://github.com/red-hat-data-services/model-metadata-collection) — gomod only, zero hermetic Dockerfile changes, data-only container (no `go build` in Dockerfile), prefetch likely for SBOM/provenance only
-- [x] [model-registry-operator](https://github.com/red-hat-data-services/model-registry-operator) — gomod only, zero hermetic Dockerfile changes, FIPS build flags (`strictfipsruntime`)
-- [x] [models-perf-benchmark-data](https://github.com/red-hat-data-services/models-perf-benchmark-data) — no prefetch, zero hermetic Dockerfile changes, data-only container (COPYs JSON files), `hermetic: true` without `prefetch-input`
-- [x] [must-gather](https://github.com/red-hat-data-services/must-gather) — no prefetch, zero hermetic Dockerfile changes, `hermetic: true` without `prefetch-input`, network access eliminated via multi-stage `COPY --from=` (kubectl) and Git LFS (helm)
-- [x] [odh-cli](https://github.com/red-hat-data-services/odh-cli) — gomod (2 entries: root + yq submodule) + pip + RPMs, zero hermetic Dockerfile changes, git submodule replaces curl for yq, `ose-cli-rhel9` base eliminates kubectl/oc download
-- [x] [ogx-k8s-operator](https://github.com/red-hat-data-services/ogx-k8s-operator) — gomod only, zero hermetic Dockerfile changes, two components (ogx-k8s-operator + llama-stack-k8s-operator) sharing same Dockerfile.konflux
-- [x] [rhods-operator](https://github.com/red-hat-data-services/rhods-operator) — gomod + RPMs, zero hermetic Dockerfile changes, `replace` directives cover sub-modules, pre-committed manifests via CI workflow eliminate 16+ git clones
-- [x] [spark-operator](https://github.com/red-hat-data-services/spark-operator) — gomod + pip/AIPCC + RPMs, EPEL for tini, installs by package name not `-r requirements.txt`
-- [x] [trainer](https://github.com/red-hat-data-services/trainer) — gomod only, zero hermetic Dockerfile changes, removed unnecessary `microdnf install` rather than prefetching
-- [x] [training-operator](https://github.com/red-hat-data-services/training-operator) — gomod + RPMs, zero hermetic Dockerfile changes, rpms.in.yaml uses bare string `containerfile` on multi-stage Dockerfile
-- [x] [trustyai-explainability](https://github.com/red-hat-data-services/trustyai-explainability) — generic + RPMs, Java/Maven project built externally via PNC, Dockerfile just unpacks pre-built zip, `artifacts.lock.yaml` auto-generated by CI
-- [x] [workload-variant-autoscaler](https://github.com/red-hat-data-services/workload-variant-autoscaler) — gomod only, zero hermetic Dockerfile changes, simplest possible case
-
-#### Fully hermetic — multi-component
-
-- [x] [ai-gateway-payload-processing](https://github.com/red-hat-data-services/ai-gateway-payload-processing) — gomod + generic, 2 components (main: zero hermetic Dockerfile changes; e2e: generic fetcher for per-arch OCP client tarballs, `${TARGETARCH}` selection)
-- [x] [argo-workflows](https://github.com/red-hat-data-services/argo-workflows) — gomod + RPMs, 2 components sharing same base image, zero hermetic Dockerfile changes, shared `rpms.in.yaml` for multi-component RPM cache
-- [x] [batch-gateway](https://github.com/red-hat-data-services/batch-gateway) — gomod only, 3 components sharing single `go.mod`, zero hermetic Dockerfile changes
-- [x] [data-science-pipelines](https://github.com/red-hat-data-services/data-science-pipelines) — gomod + RPMs, 5 components, `replace` directives to local submodules, api-server eliminated Python compiler stage instead of hermeticizing it
-- [x] [kubeflow](https://github.com/red-hat-data-services/kubeflow) — gomod only, 2 independent Go modules in `components/` subdirectories, zero hermetic Dockerfile changes, old Cachito conditional removed
-- [x] [llm-d-inference-scheduler](https://github.com/red-hat-data-services/llm-d-inference-scheduler) — gomod + generic (empty), 2 components, zero hermetic Dockerfile changes, vestigial empty `artifacts.lock.yaml` from tarball→submodule migration
-- [x] [models-as-a-service](https://github.com/red-hat-data-services/models-as-a-service) — gomod only, 2 components with separate `go.mod` in subdirectories, different `path-context` values, zero hermetic Dockerfile changes
-- [x] [odh-model-controller](https://github.com/red-hat-data-services/odh-model-controller) — gomod only, 2 components sharing single `go.mod`, `Containerfile.server.konflux` naming, `-mod=mod` flag, zero hermetic Dockerfile changes
-- [x] [rhaii-cluster-validation](https://github.com/red-hat-data-services/rhaii-cluster-validation) — gomod + RPMs (2 entries for builder/runtime stages with different base images), committed source tarball for perftest, zero hermetic Dockerfile changes
-
-#### Partially hermetic (some components hermetic, some not)
+### Repos not yet analyzed
 
 - [ ] [kserve](https://github.com/red-hat-data-services/kserve) — 6/7 hermetic (storage-initializer is not)
-- [x] [distributed-workloads](https://github.com/red-hat-data-services/distributed-workloads) — 3/11 hermetic (th06-cpu/cuda130/rocm64; odh-training-* images are not), `uv pip install` requires explicit `--no-index --find-links`, `unsafe-best-match` strategy
 - [ ] [RHOAI-Build-Config](https://github.com/red-hat-data-services/RHOAI-Build-Config) — 2/4 hermetic (operator-bundle, fbc-fragment; chart builds are not)
-- [x] [pipelines-components](https://github.com/red-hat-data-services/pipelines-components) — 2/3 hermetic (automl, autorag; main build is not), AIPCC + PyPI mixed sources, generic fetcher for ML models/SQLite, AIPCC test index
 - [ ] [feast](https://github.com/red-hat-data-services/feast) — 1/2 hermetic (feast-operator; feature-server is not)
 - [ ] [model-registry](https://github.com/red-hat-data-services/model-registry) — 1/2 hermetic (model-registry; job-async-upload is not)
 - [ ] [trustyai-service-operator](https://github.com/red-hat-data-services/trustyai-service-operator) — 1/2 hermetic (operator; ta-lmes-driver is not)
-- [x] [notebooks](https://github.com/red-hat-data-services/notebooks) — 1/18 hermetic (codeserver-datascience-cpu only; rest pending AIPCC-7795), argfile multi-variant pattern, transitional `hermetic: false` + `prefetch-input`
 
 ## Dockerfile.konflux Best Practices
 
