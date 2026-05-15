@@ -7,7 +7,6 @@
 
 ## Dockerfile.konflux Productization best practices 
 
-
 - [ ] Guide on creating a Dockerfile.konflux from an upstream Dockerfile
   - Switching upstream base images to UBI/RHEL equivalents (e.g., `python:3.12-slim` → `ubi9/python-312`, or AIPCC base images for ML workloads), including swapping `apt-get` → `microdnf`/`dnf` and adapting user/venv conventions
   - Base image pinning by digest
