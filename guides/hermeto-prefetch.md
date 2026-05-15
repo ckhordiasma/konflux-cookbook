@@ -1029,6 +1029,10 @@ context:
     imagePattern: ubi9/ubi-minimal
 ```
 
+**Multi-component repos:** If multiple components in the same repo install system packages and share the same base image, a single `rpms.in.yaml` at the repo root can serve all of them. List the union of all packages needed across components — the prefetched RPMs are a cache, and each component's `dnf install` pulls only what it needs. The `containerfile` can reference any one component's Dockerfile since the available repos are determined by the base image, which is the same for all components.
+
+If components use different base images (e.g., one uses `ubi9/go-toolset` and another uses `ubi9/python-312`), you need separate `rpms.in.yaml` and `rpms.lock.yaml` files because the available repos differ by base image. Place each pair in its own subdirectory with its own `containerfile` reference, and point each component's pipeline at the right one with `{"type": "rpm", "path": "<subdir>"}` — the `path` is a directory, and hermeto always looks for `rpms.lock.yaml` in it.
+
 The `contentOrigin` section can also be inlined instead of referencing a repo file. Include CodeReady Builder repos if you need packages like `ninja-build` that aren't in baseos or appstream:
 
 ```yaml
