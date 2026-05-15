@@ -1,6 +1,6 @@
 # Provisioning a VM on Beaker for Multi-Arch Testing
 
-> **Note:** These instructions were written for the internal Red Hat Beaker system and require Red Hat Kerberos credentials and VPN access.
+> **Note:** These instructions were written for the internal Red Hat Beaker system and require Red Hat Kerberos credentials and VPN access. URLs, distro family names, and CLI syntax were verified against Beaker as of May 2026 and may change over time.
 
 ## What is Beaker
 
