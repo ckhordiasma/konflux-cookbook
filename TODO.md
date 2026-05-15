@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- [ ] Getting a local build working on x86 or arm before moving to Konflux
+- [x] Getting a local build working on x86 or arm before moving to Konflux
 
 ## Hermetic Builds with Hermeto
 

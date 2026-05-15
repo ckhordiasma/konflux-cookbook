@@ -21,6 +21,7 @@ The `-v "$PWD:$PWD:z"` flag bind-mounts your project directory into the containe
 
 If your project uses a single package manager with standard lockfiles, the path is short:
 
+0. Build the original Dockerfile locally to establish a baseline — see [Establish a Baseline Build](#establish-a-baseline-build)
 1. Read your Dockerfile and identify every network access point (pip install, go build, npm ci, dnf install, curl/wget)
 2. Write a `hermeto-test.json` config — jump to your package manager: [pip](#pip-python) | [gomod](#gomod-go) | [npm](#npm-javascript) | [cargo](#cargo-rust)
 3. Run `hermeto fetch-deps`, fix issues, repeat until it passes — see [Building with Prefetched Dependencies](#building-with-prefetched-dependencies) (or use the [Makefile](#makefile-based-workflow) to automate steps 3–4)
@@ -42,6 +43,10 @@ This guide is long. Here's what you can skip based on your project:
 > **Do not commit `. /cachi2/cachi2.env` sourcing into your Dockerfile.konflux.** The Konflux build pipeline [automatically injects](https://github.com/konflux-ci/build-definitions/blob/44ffba6bd5e8a3da0511b13677b3a0982ae6722e/task/buildah-oci-ta/0.8/buildah-oci-ta.yaml#L749-L754) `. /cachi2/cachi2.env &&` before every `RUN` instruction at build time using a sed transform. The local testing steps in this guide replicate that injection for `podman build` — do not check those changes into your committed Dockerfile.konflux.
 
 ## Recommended Workflow
+
+### Establish a Baseline Build
+
+Before attempting hermetic builds, verify that the original Dockerfile builds successfully with `podman build`. This establishes a known-good baseline so that when something breaks during hermeticization, you know the issue is with the hermetic build setup, not the Dockerfile itself. Match the build invocation to what the CI pipeline uses — check `.tekton/*.yaml` for `build-args`, `build-arg-file`, `path-context`, and `dockerfile` parameters. If the baseline build fails, fix it before proceeding.
 
 ### Create a Dockerfile.konflux
 
