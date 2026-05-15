@@ -2,7 +2,7 @@
 
 This guide covers Python-specific workflows for hermetic Konflux builds: generating pinned requirements files, using AIPCC prebuilt wheels, and building from source on architectures that lack wheels. For the general hermeto workflow (config format, fetch-deps, local testing, Dockerfile injection), see the [main hermeto guide](hermeto-prefetch.md).
 
-The hermeto [pip config reference](hermeto-prefetch.md#pip-python) in the main guide covers the `hermeto.json` fields (`requirements_files`, `requirements_build_files`, `binary`). This guide covers what goes *into* those files.
+The hermeto [pip config reference](hermeto-prefetch.md#pip-python) in the main guide covers the `hermeto-test.json` fields (`requirements_files`, `requirements_build_files`, `binary`). This guide covers what goes *into* those files.
 
 ## Python Requirements
 

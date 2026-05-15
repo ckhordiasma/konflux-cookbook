@@ -1,6 +1,6 @@
 # Makefile.hermeto-build — Prefetch and hermetic build using Hermeto
 #
-# This Makefile takes a hermeto.json config and lockfiles as inputs,
+# This Makefile takes a hermeto-test.json config and lockfiles as inputs,
 # runs hermeto to prefetch dependencies, and builds the container
 # image offline.
 #
@@ -20,7 +20,7 @@
 # ---------------------------------------------------------------------------
 
 # Hermeto config file (written by hand following the guide)
-HERMETO_CONFIG ?= hermeto.json
+HERMETO_CONFIG ?= hermeto-test.json
 
 # Hermeto output directory
 HERMETO_OUTPUT ?= .hermeto

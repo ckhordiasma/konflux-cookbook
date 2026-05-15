@@ -49,7 +49,7 @@ Read `guides/hermeto-prefetch.md` and `guides/hermeto-python.md` (relative to th
 4. **Inventory hermetic build artifacts**: Catalog all files in the repo relevant to hermetic builds:
    - Lockfiles: `package-lock.json`, `go.sum`, `Cargo.lock`, `requirements.txt`, `requirements-build.txt`, `rpms.lock.yaml`, `Gemfile.lock`, `artifacts.lock.yaml`
    - Go workspace files: `go.work`, `go.work.sum` (if present, a single gomod prefetch entry may cover multiple modules)
-   - Config: `hermeto.json`, `rpms.in.yaml`, `ubi.repo`
+   - Config: `hermeto-test.json`, `rpms.in.yaml`, `ubi.repo`
    - Build inputs: argfiles, `.env` files, helper scripts (`hermetic_fixes.sh`, etc.)
    - Git submodules (`.gitmodules`) — submodules that replace runtime downloads (e.g., building yq from source instead of curling a binary)
    - Git LFS objects — large binaries committed via LFS that replace runtime downloads (check `.gitattributes` for LFS-tracked paths)

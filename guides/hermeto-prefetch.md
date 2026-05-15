@@ -22,7 +22,7 @@ The `-v "$PWD:$PWD:z"` flag bind-mounts your project directory into the containe
 If your project uses a single package manager with standard lockfiles, the path is short:
 
 1. Read your Dockerfile and identify every network access point (pip install, go build, npm ci, dnf install, curl/wget)
-2. Write a `hermeto.json` config — jump to your package manager: [pip](#pip-python) | [gomod](#gomod-go) | [npm](#npm-javascript) | [cargo](#cargo-rust)
+2. Write a `hermeto-test.json` config — jump to your package manager: [pip](#pip-python) | [gomod](#gomod-go) | [npm](#npm-javascript) | [cargo](#cargo-rust)
 3. Run `hermeto fetch-deps`, fix issues, repeat until it passes — see [Building with Prefetched Dependencies](#building-with-prefetched-dependencies)
 4. Test with `podman build --network none` — see [Test locally with a hermetic build](#4-test-locally-with-a-hermetic-build)
 5. Copy the JSON config into your `.tekton/` PipelineRun `prefetch-input` parameter — see [What to Commit](#what-to-commit)
@@ -53,7 +53,7 @@ The Dockerfile is the source of truth for what the build needs. Before writing a
 
 > **Red Hat note:** Generic fetcher entries require a policy exception for productized builds. Prefer the alternatives above (multi-stage copy, base image selection, building from source) when possible.
 
-Each network access point maps to a hermeto package manager config (see [Configuring hermeto.json](#configuring-hermetojson)) or needs a manual workaround.
+Each network access point maps to a hermeto package manager config (see [Configuring hermeto-test.json](#configuring-hermeto-testjson)) or needs a manual workaround.
 
 Only network access in the Dockerfile matters. A repo may contain lockfiles (e.g., `package-lock.json` for a documentation site, or `requirements.txt` for a test suite) that are never referenced by the container build -- these do not need hermeto entries. The Dockerfile is your guide, not the repo's file listing.
 
@@ -67,18 +67,18 @@ If the project has multiple Dockerfiles, identify which one is the target for he
 
 Getting a hermetic build working is an iterative process. The core loop for each package manager is:
 
-1. Add the manager to `hermeto.json` -- start with the simplest valid config (just `type` and `path`), then add options as needed (e.g., `binary` for wheels, `requirements_build_files` for sdists)
+1. Add the manager to `hermeto-test.json` -- start with the simplest valid config (just `type` and `path`), then add options as needed (e.g., `binary` for wheels, `requirements_build_files` for sdists)
 2. Run `hermeto fetch-deps` -- expect this to fail at first while you refine the config
 3. Fix issues (missing lockfiles, wrong options, version mismatches) and re-run until fetch-deps succeeds
 4. Run a build to verify the prefetched deps actually work
 
 You can work through package managers one at a time rather than configuring everything upfront. This works because some managers (like pip) use the prefetched cache automatically once the hermeto env vars are injected into the Dockerfile -- so you can run `podman build --network none` to verify that *the current manager* is fully hermetic while other managers (like RPMs) still use the network. Once one manager is confirmed hermetic, move on to the next.
 
-Alternatively, you can configure all managers in `hermeto.json` first, get `fetch-deps` passing for everything, and then do a single full hermetic build at the end. Choose whichever approach suits the complexity of your project.
+Alternatively, you can configure all managers in `hermeto-test.json` first, get `fetch-deps` passing for everything, and then do a single full hermetic build at the end. Choose whichever approach suits the complexity of your project.
 
-## Configuring `hermeto.json`
+## Configuring `hermeto-test.json`
 
-> **`hermeto.json` is for local testing only.** You do not commit this file. Once your hermetic build works locally, copy the JSON contents into the `prefetch-input` parameter of the prefetch task in your `.tekton/` PipelineRun YAML. See [What to Commit](#what-to-commit) for the full checklist.
+> **`hermeto-test.json` is for local testing only.** You do not commit this file. Once your hermetic build works locally, copy the JSON contents into the `prefetch-input` parameter of the prefetch task in your `.tekton/` PipelineRun YAML. See [What to Commit](#what-to-commit) for the full checklist.
 
 The hermeto config is a JSON array of package manager objects, each with a `type` field and manager-specific options. For single-manager configs, the pipeline also accepts a bare JSON object (e.g., `{"type": "gomod", "path": "."}`) without the array wrapper.
 
@@ -123,7 +123,7 @@ Once you have your config, use `hermeto fetch-deps` to download all the dependen
 hermeto fetch-deps \
   --source . \
   --output .hermeto \
-  hermeto.json
+  hermeto-test.json
 ```
 
 Once `fetch-deps` is used to download the dependencies, some additional configuration is needed to actually get a local offline build working. See [Building with Prefetched Dependencies](#building-with-prefetched-dependencies) for how to properly use the prefetched output in a hermetic build.
@@ -343,7 +343,7 @@ Prefetches system RPM packages. Requires an `rpms.lock.yaml` lockfile (see [RPM 
 
 Downloads arbitrary files or Maven artifacts by URL. Use this for dependencies that don't fit any other package manager -- for example, files fetched with `curl` or `wget` in the Dockerfile. Avoid using it for anything already supported by a dedicated hermeto package manager, since the SBOM entries it produces are less accurate.
 
-Dependencies are declared in an `artifacts.lock.yaml` lockfile rather than in `hermeto.json` options:
+Dependencies are declared in an `artifacts.lock.yaml` lockfile rather than in `hermeto-test.json` options:
 
 ```yaml
 metadata:
@@ -406,7 +406,7 @@ Hermeto downloads all entries regardless of the current build architecture, so e
 
 ## Building with Prefetched Dependencies
 
-Once you have a correct `hermeto.json` (see [Configuring hermeto.json](#configuring-hermetojson)), these steps download the dependencies and set up your build to use them offline.
+Once you have a correct `hermeto-test.json` (see [Configuring hermeto-test.json](#configuring-hermeto-testjson)), these steps download the dependencies and set up your build to use them offline.
 
 > **Reminder:** Do not commit the `. /cachi2/cachi2.env` sourcing into your Dockerfile.konflux — the pipeline handles this automatically (see the [warning in Quick Start](#quick-start)). The steps below are for **local testing only**.
 
@@ -418,7 +418,7 @@ This is where hermeto actually downloads all the dependencies defined by your co
 hermeto fetch-deps \
   --source . \
   --output .hermeto \
-  hermeto.json
+  hermeto-test.json
 ```
 
 You may want to add `.hermeto/` and `.hermeto.env` to your `.gitignore` and `.dockerignore` now — these are local testing artifacts that should not be committed. See [What to Commit](#what-to-commit) for the full checklist.
@@ -564,7 +564,7 @@ If you're using the cookbook Makefile (see [Makefile-Based Workflow](#makefile-b
 
 For iterative development, the cookbook provides `Makefile.hermeto-build` to automate the prefetch→sed→build pipeline. It tracks file timestamps so you can re-run individual stages without starting from scratch.
 
-Write `hermeto.json` by hand (or with the skill) following the [config reference](#configuring-hermetojson) above -- the config varies too much per project to automate generically.
+Write `hermeto-test.json` by hand (or with the skill) following the [config reference](#configuring-hermeto-testjson) above -- the config varies too much per project to automate generically.
 
 ### Setup
 
@@ -584,7 +584,7 @@ make -f Makefile.hermeto-build DOCKERFILE=Dockerfile.konflux build
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `HERMETO_CONFIG` | `hermeto.json` | Path to hermeto JSON config |
+| `HERMETO_CONFIG` | `hermeto-test.json` | Path to hermeto JSON config |
 | `HERMETO_OUTPUT` | `.hermeto` | Output directory for prefetched deps |
 | `DOCKERFILE` | `Dockerfile.konflux` | Source Dockerfile to transform |
 | `BUILD_CONTEXT` | `.` | Docker build context directory |
@@ -762,7 +762,7 @@ Once your hermetic build is working:
 - `rpms.in.yaml` and `rpms.lock.yaml` (if using RPM prefetch)
 
 **Do not commit:**
-- `hermeto.json` -- for local testing only. The config is inlined in the Tekton PipelineRun prefetch task parameter.
+- `hermeto-test.json` -- for local testing only. The config is inlined in the Tekton PipelineRun prefetch task parameter.
 - `.hermeto/` -- the prefetched output directory
 - `.hermeto.env` -- the generated environment file
 
@@ -772,7 +772,7 @@ Consider adding these to `.gitignore` and `.dockerignore` to avoid accidentally 
 - Lockfiles like `requirements.txt`, `requirements-build.txt`, and `rpms.lock.yaml` need to be regenerated when dependencies change. Consider adding a Makefile target, script, or CI job to automate this so the committed lockfiles stay in sync with your project's dependency declarations.
 
 **Update in Tekton:**
-- Copy the contents of `hermeto.json` into the prefetch task parameter in your `.tekton/` PipelineRun
+- Copy the contents of `hermeto-test.json` into the prefetch task parameter in your `.tekton/` PipelineRun
 
 ## Common Gotchas
 
@@ -831,7 +831,7 @@ If you prefetch RPMs, these packages need to appear in both `rpms.in.yaml` (so t
 Some Rust extensions ship with out-of-sync `Cargo.lock` / `Cargo.toml`. If `hermeto fetch-deps` fails due to lockfile mismatches or other non-fatal inconsistencies:
 
 ```bash
-hermeto --mode permissive fetch-deps hermeto.json
+hermeto --mode permissive fetch-deps hermeto-test.json
 ```
 
 This regenerates lockfiles instead of erroring out. Note that this reduces reproducibility -- the SBOM may not perfectly reflect what was built.

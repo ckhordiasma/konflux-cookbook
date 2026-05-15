@@ -16,7 +16,7 @@ Read `guides/hermeto-prefetch.md` (relative to the plugin root) thoroughly befor
 
 3. **Analyze the Dockerfile**: Follow the "Start from the Dockerfile" section in the guide. Present a summary to the user mapping each network access point to the hermeto config section that would replace it, and flag anything that doesn't map to a supported package manager.
 
-4. **Build the hermeto config**: Follow the "Configuring hermeto.json" section in the guide for each package manager found in step 3. For package-manager-specific setup (e.g., Python requirements compilation, RPM lockfile generation), follow the corresponding guide sections. Show the user the config as you build it, and frequently ask the user for input.
+4. **Build the hermeto config**: Follow the "Configuring hermeto-test.json" section in the guide for each package manager found in step 3. For package-manager-specific setup (e.g., Python requirements compilation, RPM lockfile generation), follow the corresponding guide sections. Show the user the config as you build it, and frequently ask the user for input.
 
 5. **Iterate and test**: Follow the "Iterate one package manager at a time" and "Building with Prefetched Dependencies" sections in the guide. Ask the user whether they want to iterate one manager at a time or configure everything first. Consult "Common Gotchas" when builds fail.
 
