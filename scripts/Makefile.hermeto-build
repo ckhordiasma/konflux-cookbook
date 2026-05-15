@@ -111,9 +111,9 @@ build: $(HERMETO_SENTINEL) $(HERMETO_ENV) $(HERMETO_DOCKERFILE)
 	podman build \
 	  --no-cache \
 	  --network none \
-	  --volume "$(realpath ./$(HERMETO_OUTPUT))":/cachi2/output:Z \
-	  --volume "$(realpath ./$(HERMETO_ENV))":/cachi2/cachi2.env:Z \
-	  $(if $(wildcard $(RPM_REPOS_DIR)),--volume "$(realpath ./$(RPM_REPOS_DIR))":/etc/yum.repos.d:Z) \
+	  --volume "$(realpath ./$(HERMETO_OUTPUT))":/cachi2/output:z \
+	  --volume "$(realpath ./$(HERMETO_ENV))":/cachi2/cachi2.env:z \
+	  $(if $(wildcard $(RPM_REPOS_DIR)),--volume "$(realpath ./$(RPM_REPOS_DIR))":/etc/yum.repos.d:z) \
 	  -f $(HERMETO_DOCKERFILE) $(BUILD_CONTEXT)
 
 # ---------------------------------------------------------------------------

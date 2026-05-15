@@ -4,7 +4,6 @@
 
 ## Hermetic Builds — Open Questions
 
-- [ ] Verify Makefile.hermeto-build is consistent with the manual steps documented in the hermeto-prefetch guide (generate-env, sed injection, inject-files, podman build)
 
 ## Dockerfile.konflux Productization best practices 
 
