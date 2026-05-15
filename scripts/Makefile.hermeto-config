@@ -61,7 +61,7 @@ UV_COMPILE := uv pip compile --python-platform linux --python-version $(PYTHON_V
 
 # Add index flags if INDEX_URL is set
 ifneq ($(INDEX_URL),)
-  UV_COMPILE += --index $(INDEX_URL) --index-strategy first-index --emit-index-annotation
+  UV_COMPILE += --default-index $(INDEX_URL) --index-strategy first-index --emit-index-url
 endif
 
 # Append any extra args
