@@ -45,7 +45,7 @@ ifeq ($(ARCH),arm64)
 endif
 
 # Run hermeto via its container image
-HERMETO := podman run --rm -ti -v "$(CURDIR):$(CURDIR):z" -w "$(CURDIR)" \
+HERMETO := podman run --rm -v "$(CURDIR):$(CURDIR):z" -w "$(CURDIR)" \
   ghcr.io/hermetoproject/hermeto:latest
 
 # Use gsed on macOS, sed on Linux
@@ -100,7 +100,6 @@ dockerfile: check-sed $(HERMETO_DOCKERFILE)
 # build: run the podman build fully offline with prefetched deps mounted in.
 # ---------------------------------------------------------------------------
 RPM_REPOS_DIR := $(HERMETO_OUTPUT)/deps/rpm/$(ARCH)/repos.d
-RPM_VOLUME := $(shell test -d $(RPM_REPOS_DIR) && echo '--volume "$(realpath ./$(RPM_REPOS_DIR))":/etc/yum.repos.d:Z')
 
 build: $(HERMETO_SENTINEL) $(HERMETO_DOCKERFILE)
 	podman build \
@@ -108,7 +107,7 @@ build: $(HERMETO_SENTINEL) $(HERMETO_DOCKERFILE)
 	  --network none \
 	  --volume "$(realpath ./$(HERMETO_OUTPUT))":/cachi2/output:Z \
 	  --volume "$(realpath ./.hermeto.env)":/cachi2/cachi2.env:Z \
-	  $(RPM_VOLUME) \
+	  $(if $(wildcard $(RPM_REPOS_DIR)),--volume "$(realpath ./$(RPM_REPOS_DIR))":/etc/yum.repos.d:Z) \
 	  -f $(HERMETO_DOCKERFILE) $(BUILD_CONTEXT)
 
 # ---------------------------------------------------------------------------
