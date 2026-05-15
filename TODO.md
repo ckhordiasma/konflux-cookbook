@@ -6,8 +6,8 @@
 
 ## Hermetic Builds with Hermeto
 
-- [ ] Document `-test` index variants (e.g., `cpu-ubi9-test/simple/`) that carry midstream/pre-release builds like `vllm==0.18.0+rhaiv.4` — found in llm-d-kv-cache and llama-stack-provider repos
-- [ ] Clarify the two URL prefixes (`console.redhat.com` vs `packages.redhat.com`) — both work, repos use them interchangeably
+- [x] Document `-test` index variants (e.g., `cpu-ubi9-test/simple/`) that carry midstream/pre-release builds like `vllm==0.18.0+rhaiv.4` — found in llm-d-kv-cache and llama-stack-provider repos
+- [x] Clarify the two URL prefixes (`console.redhat.com` vs `packages.redhat.com`) — both work, repos use them interchangeably
 
 ## Dockerfile.konflux Best Practices
 
@@ -30,13 +30,18 @@
   - Other Konflux-general practices that aren't hermeto-specific
 - [ ] Renovate guide -- how Renovate auto-updates pinned base image digests in Dockerfiles, and how this interacts with build-arg patterns (currently Renovate scans `FROM` lines for digest pins, so switching to `ARG BASE_IMAGE=...@sha256:...` + `FROM ${BASE_IMAGE}` may require renovate config changes to keep automated updates working)
 
+## FIPS Compliance
+
+- [ ] Guide on running check-payload locally to detect FIPS issues before pushing to Konflux. Include common fixes: Go builds (`GOEXPERIMENT=strictfipsruntime`, `-tags strictfipsruntime`, `CGO_ENABLED=1`), FIPS build hardcoding in Dockerfile.konflux (removing dev toggles like `FIPS_ENABLED`), Python/OpenSSL considerations
+
 ## Conforma Compliance
 
 - [ ] Getting your build to pass Conforma compliance checks
 
-## Validating with Konflux PR Builds
+## Deploying to Konflux
 
-- [ ] Creating a temporary pull request pipeline to test builds before merging (see existing guide: `create-pr-pipeline`)
+- [x] Guide on deploying hermetic build config to Konflux (Option 1: midstream ODH builds)
+- [x] Document Option 2: applying directly to downstream (red-hat-data-services) builds
 
 ## Skills
 
