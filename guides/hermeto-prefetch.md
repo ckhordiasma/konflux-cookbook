@@ -165,6 +165,8 @@ Go projects are often the simplest case for hermetic builds — the `gomod` pref
 
 **Multi-module repos with `replace` directives:** If the root `go.mod` uses `replace` directives to point at local submodules (e.g., `replace github.com/org/repo/api => ./api`), a single gomod entry at the root is also sufficient — Go resolves the local modules through the replacement path, so hermeto prefetches all external dependencies in one pass. This is common in operator repos where an `api/` submodule is consumed by the main module.
 
+External `replace` directives that rewrite one remote module to another (e.g., `replace sigs.k8s.io/upstream => github.com/org/fork v1.0.0`) are also transparent to hermeto — it prefetches the replacement module as part of the normal dependency graph. These are common in RHOAI repos that fork upstream modules. A single gomod entry still suffices.
+
 Without `go.work` or `replace` directives, each module needs its own gomod entry:
 
 ```json
