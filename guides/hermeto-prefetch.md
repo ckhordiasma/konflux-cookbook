@@ -884,6 +884,37 @@ If your requirements pin AIPCC-specific versions with release suffixes like `vll
 
 Use `--prerelease=allow` only if you specifically need an RC version. See [AIPCC: pre-release versions break multi-arch builds](#aipcc-pre-release-versions-break-multi-arch-builds) for details.
 
+**Use `--no-strip-markers` to preserve platform-specific markers.** Some dependencies are only needed on certain architectures — for example, `triton` is a torch dependency only on `platform_machine != "s390x"`. By default, `uv pip compile` strips environment markers from the output, producing a flat list like `triton==3.6.0` that pip will try to install everywhere. Adding `--no-strip-markers` preserves the markers in the output (e.g., `triton==3.6.0 ; platform_machine != 's390x'`), so pip skips arch-specific packages on architectures that don't need them.
+
+**Verifying multi-arch compatibility:**
+
+The flags above (`--prerelease=if-necessary`, `--no-strip-markers`, `--default-index`) handle the common cases, but AIPCC index coverage can change between releases. To be certain your requirements.txt will install on all target architectures, run `uv pip compile` on a machine of each target architecture (e.g., [Beaker VMs](beaker-vm.md)) and compare the resolved versions. If every arch resolves to the same package versions, your requirements.txt is safe. If they diverge, the differing package likely has an RC or newer version on some arches but not others — constrain it to the version available everywhere, or use `--prerelease=if-necessary` to avoid the RC.
+
+As a last resort, if you cannot get a single requirements.txt that resolves identically on all architectures, generate a separate requirements file per arch (e.g., `requirements-x86_64.txt`, `requirements-s390x.txt`) and pass them all to hermeto:
+
+```json
+{
+  "type": "pip",
+  "path": ".",
+  "requirements_files": [
+    "requirements-x86_64.txt",
+    "requirements-aarch64.txt",
+    "requirements-ppc64le.txt",
+    "requirements-s390x.txt"
+  ],
+  "binary": { "arch": "x86_64,aarch64,ppc64le,s390x" }
+}
+```
+
+Hermeto merges all the files and fetches the union of dependencies. At install time, pip on each architecture installs only the packages that match its platform. The Dockerfile selects the right file at build time using `$(uname -m)`:
+
+```dockerfile
+COPY requirements-*.txt ./
+RUN pip install --no-cache-dir -r requirements-$(uname -m).txt
+```
+
+This is the most reliable approach but adds maintenance burden — you must recompile each file when dependencies change. Prefer fixing the root cause (constraining versions, using `--prerelease=if-necessary`) and use per-arch files only for arches that genuinely need different versions.
+
 **Critical: `--index-url` must be a pip directive in requirements.txt.** Hermeto reads `--index-url` directives from requirements files to know where to download packages. The `--emit-index-annotation` flag only adds comments (e.g., `# from https://...`), which hermeto ignores — without an actual `--index-url` directive, hermeto defaults to PyPI and fetches `manylinux` wheels or sdists instead of AIPCC's `linux_*` wheels. Using `--default-index` with `--emit-index-url` (as shown above) handles this automatically. If you omit `--emit-index-url`, add `--index-url` to the top of your compiled requirements.txt manually:
 
 ```
