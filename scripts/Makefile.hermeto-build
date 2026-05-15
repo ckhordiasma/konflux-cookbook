@@ -19,7 +19,7 @@
 # Configuration — edit these for your project
 # ---------------------------------------------------------------------------
 
-# Hermeto config file (produced by Makefile.hermeto-config or written by hand)
+# Hermeto config file (written by hand following the guide)
 HERMETO_CONFIG ?= hermeto.json
 
 # Hermeto output directory
