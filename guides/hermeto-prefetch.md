@@ -421,6 +421,8 @@ hermeto fetch-deps \
   hermeto.json
 ```
 
+You may want to add `.hermeto/` and `.hermeto.env` to your `.gitignore` and `.dockerignore` now — these are local testing artifacts that should not be committed. See [What to Commit](#what-to-commit) for the full checklist.
+
 ### 2. Generate the environment file and modify the Dockerfile
 
 ```bash

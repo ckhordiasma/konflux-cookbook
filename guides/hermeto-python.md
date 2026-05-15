@@ -187,7 +187,7 @@ Then reference it in your hermeto config:
 
 This applies to any dependency source, not just PyPI. If your project installs packages from git URLs (e.g., `git+https://github.com/org/repo@tag`), those packages must also be published to the AIPCC index. Git-sourced dependencies are incompatible with pip's hash-checking mode, so mixing them with hashed AIPCC packages in the same requirements file does not work. The fix is to get the midstream package onboarded to AIPCC — for example, the llama-stack-provider team had garak published as `garak==0.14.1+rhaiv.8` on the AIPCC index rather than installing it from a git URL.
 
-AIPCC provides separate indexes per RHOAI release and accelerator variant. Browse available indexes at [packages.redhat.com](https://packages.redhat.com/domains/public-rhai/distributions). For RHOAI 3.4:
+AIPCC provides separate indexes per RHOAI release and accelerator variant. Browse [packages.redhat.com](https://packages.redhat.com/domains/public-rhai/distributions) for the current list — the versions and variants below were current as of RHOAI 3.4 and may have changed since:
 
 | Variant | Index URL | Base Image |
 |---------|-----------|------------|

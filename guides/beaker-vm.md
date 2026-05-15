@@ -35,7 +35,7 @@ Once you have a machine provisioned, you can use it as a remote build host for h
 
 5. Click **Submit job** and wait for your recipe to finish provisioning.
 
-6. Once provisioned, SSH into the machine as root. The default root password is shown in your [Beaker preferences](https://beaker.engineering.redhat.com/prefs/#root-password). You can also configure your SSH key in preferences for future reservations.
+6. Once provisioned, SSH into the machine as root. The default root password is shown in your [Beaker preferences](https://beaker.engineering.redhat.com/prefs/#root-password). Setting up SSH key auth (described in the next section) is recommended over using the default password.
 
 ## Automating with the `bkr` CLI
 
