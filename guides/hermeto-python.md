@@ -159,7 +159,7 @@ Match the `--python` version to your target image. This file is needed if any of
 
 Example `requirements-build.txt` for a project that uses poetry-core:
 ```
---index-url https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9/simple/
+--index-url https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9/simple/
 poetry-core==1.9.1
 ```
 
@@ -198,7 +198,7 @@ AIPCC provides separate indexes per RHOAI release and accelerator variant. Brows
 | CUDA 13.0 | `.../rhoai/3.4/cuda13.0-ubi9/simple/` | `quay.io/aipcc/base-images/cuda-13.0-el9.6:3.4.0-...` |
 | ROCm 6.4 | `.../rhoai/3.4/rocm6.4-ubi9/simple/` | `quay.io/aipcc/base-images/rocm-6.4-el9.6:3.4.0-...` |
 
-The full index URL prefix is `https://console.redhat.com/api/pypi/public-rhai/`. The base images are pre-configured so that `pip` and `uv` pull from the matching index automatically.
+The full index URL prefix is `https://packages.redhat.com/api/pypi/public-rhai/`. You may also see `https://console.redhat.com/api/pypi/public-rhai/` in some repos — both serve identical content and are interchangeable. The base images are pre-configured so that `pip` and `uv` pull from the matching index automatically.
 
 ### Requesting packages
 
@@ -214,6 +214,14 @@ Key points:
 
 Ask in [#forum-aipcc](https://redhat-internal.slack.com/archives/C07JX0EMKCZ) for general questions or [#forum-aipcc-wheels](https://redhat-internal.slack.com/archives/C079FE5H94J) for wheel-specific issues.
 
+### Test indexes
+
+Each AIPCC variant has a corresponding `-test` index (e.g., `cpu-ubi9-test/simple/` alongside `cpu-ubi9/simple/`). Newly onboarded packages land in the test index first, where automated QA verification runs against every base image variant. Once all variants pass, the package is promoted to the production index. This cycle runs every 3 hours.
+
+Use the test index when you need a package that has been built but hasn't completed the QA and promotion cycle yet — typically midstream builds with `+rhaiv.N` version suffixes during EA development. You can point your entire `--index-url` at the test index (as [llama-stack-provider](https://github.com/red-hat-data-services/llama-stack-provider-trustyai-garak/blob/e6d91bc7494b7f6b381cf5f8b12593378955572b/requirements.txt) does), or route specific packages to it via `[tool.uv.sources]` while keeping the production index as default (as [llm-d-kv-cache](https://github.com/red-hat-data-services/llm-d-kv-cache/blob/9bc871c55dcb64e4d6da4a73bde956e115bb0881/services/uds_tokenizer/pyproject.toml) does for `vllm`). Either way, the test index URL ends up in the compiled `requirements.txt` as the `--index-url` directive, and hermeto fetches from it like any other index.
+
+For stable releases, prefer the production index — test and production have largely converged and the production index is the supported target.
+
 ### Getting started with AIPCC
 
 Start by getting your build working non-hermetically using the AIPCC base image and its pre-configured index. Once your `pip install` succeeds, freeze your dependencies with `uv pip compile` to produce a pinned requirements file that hermeto can prefetch from the AIPCC index.
@@ -226,7 +234,7 @@ Point `uv pip compile` at the AIPCC index with `--default-index` and `--index-st
 uv pip compile requirements.in \
   --python-platform linux \
   --python-version 3.12 \
-  --default-index https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9/simple/ \
+  --default-index https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9/simple/ \
   --index-strategy first-index \
   --emit-index-url \
   --emit-index-annotation \
@@ -238,7 +246,7 @@ If your project uses extras:
 uv pip compile pyproject.toml \
   --python-platform linux \
   --extra server --extra tracing \
-  --default-index https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9/simple/ \
+  --default-index https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9/simple/ \
   --index-strategy first-index \
   --emit-index-url \
   --emit-index-annotation \
@@ -288,7 +296,7 @@ This is the most reliable approach but adds maintenance burden — you must reco
 **Critical: `--index-url` must be a pip directive in requirements.txt.** Hermeto reads `--index-url` directives from requirements files to know where to download packages. The `--emit-index-annotation` flag only adds comments (e.g., `# from https://...`), which hermeto ignores — without an actual `--index-url` directive, hermeto defaults to PyPI and fetches `manylinux` wheels or sdists instead of AIPCC's `linux_*` wheels. Using `--default-index` with `--emit-index-url` (as shown above) handles this automatically. If you omit `--emit-index-url`, add `--index-url` to the top of your compiled requirements.txt manually:
 
 ```
---index-url https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9/simple/
+--index-url https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu-ubi9/simple/
 ```
 
 The `--index-strategy first-index` strategy prefers packages from the first index listed (AIPCC) and is the recommended approach. Some repos use `--index-strategy unsafe-best-match` instead, which picks the highest version across all indexes — this lets AIPCC's patched versions (e.g., `vllm==0.18.0+rhaiv.4`) win over PyPI's unpatched version numbers. However, `unsafe-best-match` can silently pull packages from PyPI when they are missing or lower-versioned on AIPCC, resulting in a mix of sources that is not supported by AIPCC (see the warning above about mixing indexes).
@@ -441,7 +449,7 @@ AIPCC may publish release candidate versions (e.g., `safetensors==0.8.0rc0`) for
 uv pip compile pyproject.toml \
   --python-platform linux \
   --python-version 3.12 \
-  --default-index https://console.redhat.com/api/pypi/public-rhai/rhoai/3.5-EA1/cpu-ubi9/simple/ \
+  --default-index https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.5-EA1/cpu-ubi9/simple/ \
   --index-strategy first-index \
   --prerelease=if-necessary \
   --emit-index-url \
@@ -451,4 +459,4 @@ uv pip compile pyproject.toml \
 
 If you need a specific RC version, pin it explicitly in your constraints instead of using `--prerelease=allow` globally.
 
-**Diagnosis:** When a multi-arch build fails with `No matching distribution found` for a package with an RC version number, check whether the AIPCC index has that version for all target architectures. Browse the index at `https://console.redhat.com/api/pypi/public-rhai/rhoai/{release}/{variant}/simple/{package}/` and look for wheels with your failing architecture's platform tag (e.g., `linux_s390x`).
+**Diagnosis:** When a multi-arch build fails with `No matching distribution found` for a package with an RC version number, check whether the AIPCC index has that version for all target architectures. Browse the index at `https://packages.redhat.com/api/pypi/public-rhai/rhoai/{release}/{variant}/simple/{package}/` and look for wheels with your failing architecture's platform tag (e.g., `linux_s390x`).
