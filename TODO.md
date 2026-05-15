@@ -4,8 +4,6 @@
 
 ## Hermetic Builds — Open Questions
 
-- [ ] Search all Rust-based builds in RHOAI to confirm that installing `rust-toolset` RPM into a UBI9 base is the standard pattern (no dedicated Rust builder image exists)
-
 - [ ] Verify Makefile.hermeto-build is consistent with the manual steps documented in the hermeto-prefetch guide (generate-env, sed injection, inject-files, podman build)
 
 ## Dockerfile.konflux Productization best practices 

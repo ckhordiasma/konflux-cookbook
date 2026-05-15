@@ -218,7 +218,7 @@ If a package has no wheel for your target architecture on PyPI (a regular occurr
 
 [Hermeto cargo docs](https://hermetoproject.github.io/hermeto/latest/cargo/)
 
-Requires `Cargo.toml` and `Cargo.lock` to be present and in sync. There is no dedicated UBI9 Rust builder image (unlike Go's `ubi9/go-toolset`). Install `rust-toolset` via RPM into a UBI9 base image in your Dockerfile's builder stage.
+Requires `Cargo.toml` and `Cargo.lock` to be present and in sync. There is no dedicated UBI9 Rust builder image (unlike Go's `ubi9/go-toolset`). Install `rust` and `cargo` via RPM into a UBI9 base image in your Dockerfile's builder stage. Include these packages in your `rpms.lock.yaml` so they are prefetched hermetically (see [RPM prefetch](#rpm)). For a working example, see the feast feature-server [Dockerfile.konflux](https://github.com/red-hat-data-services/feast/blob/055648eed693fbbbd4a644b0617c7c7a52ed7e5f/Dockerfiles/Dockerfile.feature-server.konflux) and [rpms.lock.yaml](https://github.com/red-hat-data-services/feast/blob/055648eed693fbbbd4a644b0617c7c7a52ed7e5f/sdk/python/feast/infra/feature_servers/multicloud/offline/rpms.lock.yaml), which prefetches `rust`, `cargo`, `rust-std-static`, and their dependencies across all target architectures.
 
 **Config fields:**
 
