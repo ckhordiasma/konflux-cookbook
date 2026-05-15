@@ -309,7 +309,7 @@ Requires `package.json` and `package-lock.json`.
 
 Run `find . -name package-lock.json -not -path '*/node_modules/*'` to find all lockfiles that may need entries.
 
-> **Note:** `npm ci --ignore-scripts` and `npm install --ignore-scripts` work correctly with prefetch. The `--ignore-scripts` flag skips lifecycle scripts (preinstall, postinstall, etc.) and is a good security practice for container builds since it prevents arbitrary code execution during dependency installation.
+> **Note:** `npm ci --ignore-scripts` and `npm install --ignore-scripts` will work correctly with prefetch. The `--ignore-scripts` flag skips lifecycle scripts (preinstall, postinstall, etc.) and is a good security practice for container builds since it prevents arbitrary code execution during dependency installation.
 
 ### yarn (JavaScript)
 
@@ -358,7 +358,7 @@ Requires `Gemfile` and `Gemfile.lock`.
 
 [Hermeto rpm docs](https://hermetoproject.github.io/hermeto/latest/rpm/)
 
-Prefetches system RPM packages. Requires an `rpms.lock.yaml` lockfile (see [RPM Dependencies](#rpm-dependencies) below for how to generate it).
+Prefetches system RPM packages. Requires an `rpms.lock.yaml` lockfile (see [RPM Dependencies](#rpm-dependencies) below for how to generate it). [TODO I think it would make sense to put the rpm-dependencies section here]
 
 **Config fields:**
 
@@ -376,9 +376,9 @@ Prefetches system RPM packages. Requires an `rpms.lock.yaml` lockfile (see [RPM 
 
 [Hermeto generic docs](https://hermetoproject.github.io/hermeto/latest/generic/)
 
-Downloads arbitrary files or Maven artifacts by URL. Use this for dependencies that don't fit any other package manager -- for example, files fetched with `curl` or `wget` in the Dockerfile. Avoid using it for anything already supported by a dedicated hermeto package manager, since the SBOM entries it produces are less accurate.
+Downloads arbitrary files or Maven artifacts by URL. Use this for dependencies that don't fit any other package manager -- for example, files fetched with `curl` or `wget` in the Dockerfile. Avoid using it for anything already supported by a dedicated hermeto package manager, since the SBOM entries it produces are less accurate. [TODO make sure this language aligns with the stuff I added earlier about SBOM]
 
-Dependencies are declared in an `artifacts.lock.yaml` lockfile rather than in `hermeto-test.json` options:
+Dependencies are declared in an `artifacts.lock.yaml` lockfile, which will be referenced in `hermeto-test.json`:
 
 ```yaml
 metadata:
@@ -401,9 +401,9 @@ artifacts:
     checksum: "sha256:4cbbd9243de4c1042d61d9a15db4c43c90ff93b16d78b39481da1c956c8e9671"
 ```
 
-Each artifact requires a `checksum` in `algorithm:hash` format. Downloaded files are stored in `deps/generic/` within the output directory — at build time, the full path is `/cachi2/output/deps/generic/<filename>`.
+Each artifact requires a `checksum` in `algorithm:hash` format. Downloaded files are stored in `deps/generic/` within the hermeto output directory — [TODO make the following sentence a note. and say that konflux follows the /cachi2/output convention, and this guide follows what konflux does] at build time, the full path is `/cachi2/output/deps/generic/<filename>`.
 
-**Architecture-specific artifacts:** The generic fetcher does not support architecture variables in URLs or filenames — each entry is a literal download. For tools that publish per-arch binaries (e.g., kubectl, oc, helm), add a separate entry for each target architecture and use the Dockerfile's `${TARGETARCH}` variable to select the right file at build time:
+**Architecture-specific artifacts:** The generic fetcher does not support architecture variables in URLs or filenames — each entry is a literal download. If per-architecture files are needed, add a separate entry for each target architecture and use the Dockerfile's `${TARGETARCH}` variable to select the right file at build time:
 
 ```yaml
 artifacts:
@@ -416,13 +416,13 @@ artifacts:
 ```
 
 ```dockerfile
-# In a builder stage (ubi-minimal lacks tar):
+# In a builder stage:
 RUN tar -xzf /cachi2/output/deps/generic/openshift-client-linux-${TARGETARCH}-rhel9-4.21.15.tar.gz \
     -C /tmp/ kubectl && \
     mv /tmp/kubectl /usr/local/bin/kubectl
 ```
 
-Hermeto downloads all entries regardless of the current build architecture, so each arch build finds its matching file. Keep the lockfile entries aligned with your pipeline's `build-platforms` — if you add ppc64le or s390x later, you need corresponding entries in `artifacts.lock.yaml`. See [ai-gateway-payload-processing](https://github.com/red-hat-data-services/ai-gateway-payload-processing/blob/rhoai-3.5-ea.1/artifacts.lock.yaml) for a working example.
+Hermeto downloads all entries regardless of the current build architecture, so each arch build finds its matching file. Keep the lockfile entries aligned with your pipeline's `build-platforms` — if you add ppc64le or s390x later, you need corresponding entries in `artifacts.lock.yaml`. See [ai-gateway-payload-processing](https://github.com/red-hat-data-services/ai-gateway-payload-processing/blob/rhoai-3.5-ea.1/artifacts.lock.yaml) [SHA-pin this example link] for a working example.
 
 **Config fields:**
 
@@ -439,17 +439,17 @@ Hermeto downloads all entries regardless of the current build architecture, so e
 
 #### Java/Maven projects
 
-Hermeto has no native Maven package manager type. For Red Hat productized Java builds, the typical pattern is to build the artifact externally using [PNC](https://github.com/project-newcastle) (Project Newcastle), then use the generic fetcher to download the pre-built artifact into the hermetic build. A CI workflow (e.g., a GitHub Action) triggers the PNC build, extracts the artifact URL and checksum, and commits the resulting `artifacts.lock.yaml`. The Dockerfile.konflux then just unpacks the pre-built artifact — no `mvn` or `gradle` runs inside the container at all. See [trustyai-explainability](https://github.com/red-hat-data-services/trustyai-explainability/tree/rhoai-3.5-ea.1) for a working example of this pattern.
+Hermeto has no native Maven package manager type. For Red Hat productized Java builds, the typical pattern is to build the artifact externally using [PNC](https://github.com/project-newcastle) (Project Newcastle), then use the generic fetcher to download the pre-built artifact into the hermetic build. A CI workflow (e.g., a GitHub Action) triggers the PNC build, extracts the artifact URL and checksum, and commits the resulting `artifacts.lock.yaml`. The Dockerfile.konflux then just unpacks the pre-built artifact — no `mvn` or `gradle` runs inside the container at all. See [trustyai-explainability](https://github.com/red-hat-data-services/trustyai-explainability/tree/rhoai-3.5-ea.1) [sha-pin this example] for a working example of this pattern.
 
 ## Building with Prefetched Dependencies
 
-Once you have a correct `hermeto-test.json` (see [Configuring hermeto-test.json](#configuring-hermeto-testjson)), these steps download the dependencies and set up your build to use them offline.
+Once you have a correct `hermeto-test.json` (previous step: [Configuring hermeto-test.json](#configuring-hermeto-testjson)), the next thing to do is to have Hermeto download the dependencies and set up your build to use them offline.
 
 > **Reminder:** Do not commit the `. /cachi2/cachi2.env` sourcing into your Dockerfile.konflux — the pipeline handles this automatically (see the [warning in Quick Start](#quick-start)). The steps below are for **local testing only**.
 
 ### 1. Fetch dependencies
 
-This is where hermeto actually downloads all the dependencies defined by your config into a local output directory:
+This command downloads all the dependencies defined by your config into a local output directory:
 
 ```bash
 hermeto fetch-deps \
@@ -458,10 +458,10 @@ hermeto fetch-deps \
   hermeto-test.json
 ```
 
-You may want to add `.hermeto/` and `.hermeto.env` to your `.gitignore` and `.dockerignore` now — these are local testing artifacts that should not be committed. See [What to Commit](#what-to-commit) for the full checklist.
+You may want to add `.hermeto/` and `.hermeto.env` to your `.gitignore` and `.dockerignore` now — these are local testing artifacts that should not be committed. See [What to Commit](#what-to-commit) for the full list.
 
 ### 2. Generate the environment file and modify the Dockerfile
-
+[TODO - add a TODO.md entry for making sure my makefile is consistent with the guide]
 ```bash
 hermeto generate-env .hermeto/ -o .hermeto.env \
   --for-output-dir /cachi2/output
@@ -471,7 +471,7 @@ This creates a file containing the environment variables that configure package 
 
 This environment file must be sourced before every `RUN` command in your Dockerfile that installs dependencies. In the Konflux build task, [this is handled automatically](https://github.com/konflux-ci/build-definitions/blob/44ffba6bd5e8a3da0511b13677b3a0982ae6722e/task/buildah-oci-ta/0.8/buildah-oci-ta.yaml#L749-L754) by using sed to inject `. /cachi2/cachi2.env &&` at the start of every `RUN` instruction.
 
-For local testing, generate a modified copy of your Dockerfile with the same sed command rather than editing the original in-place (the Makefile also takes this approach):
+For local testing, we generate a modified copy of your Dockerfile with the same sed command rather than editing the original in-place (the Makefile Example [TODO link] also takes this approach):
 
 ```bash
 sed -E \
@@ -482,7 +482,7 @@ sed -E \
 
 This regex is intentionally identical to the one used in the [Konflux buildah task](https://github.com/konflux-ci/build-definitions/blob/44ffba6bd5e8a3da0511b13677b3a0982ae6722e/task/buildah-oci-ta/0.8/buildah-oci-ta.yaml#L749-L754) so that local testing matches production behavior exactly. It matches every `RUN` instruction — including those with flags like `RUN --mount=type=cache ...` — and prepends `. /cachi2/cachi2.env &&` so the environment is sourced before each command. This produces `.hermeto/Dockerfile.konflux` with the env file sourced in every `RUN`, leaving your original Dockerfile untouched. Use this generated Dockerfile for the local hermetic build in step 4.
 
-> **macOS note:** The `M` (multiline) flag in the sed command above is a GNU extension. macOS ships BSD sed, which does not support it. Install GNU sed with `brew install gnu-sed` and use `gsed` instead of `sed`.
+> **macOS note:** The `M` (multiline) flag in the sed command above is a GNU extension. macOS ships BSD sed, which does not support it. If you're on macOS, install GNU sed with `brew install gnu-sed` and use `gsed` instead of `sed`.
 
 ### 3. Inject configuration files
 
@@ -490,7 +490,7 @@ This regex is intentionally identical to the one used in the [Konflux buildah ta
 hermeto inject-files ./.hermeto --for-output-dir /cachi2/output
 ```
 
-Some package managers need config files created or modified to point at the local cache -- for example, cargo requires a `.cargo/config.toml` with the local registry path, and gomod needs `GONOSUMDB`/`GONOSUMCHECK` settings. This step handles that automatically. Not all package managers need it (pip and rpm do not), but it is safe to run regardless. Note that this may overwrite files in your working tree.
+Some package managers need config files created or modified to point at the local cache -- for example, cargo requires a `.cargo/config.toml` with the local registry path, and gomod needs `GONOSUMDB`/`GONOSUMCHECK` settings. This step handles that automatically. Not all package managers need it (pip and rpm do not), but it is safe to run regardless. Note that this may overwrite files in your working tree, and you should revert these changes before committing anything.
 
 ### 4. Test locally with a hermetic build
 
@@ -503,14 +503,22 @@ podman build . \
   -f .hermeto/Dockerfile.konflux
 ```
 
-- `--network none` proves that all dependencies are actually prefetched.
-- The `.` after `podman build` is the build context directory. Change it if your Dockerfile expects a different context. For example, if your pipeline uses `path-context: python` and `dockerfile: ../Dockerfile.konflux`, run `podman build python/ -f .hermeto/Dockerfile.konflux ...` — the context is the subdirectory, but the Dockerfile remains at the repo root. Getting this wrong causes `COPY` instructions to fail with confusing "file not found" errors.
+- `--network none` proves that all dependencies are actually prefetched by making the build completely offline.
+- The `.` after `podman build` is the build context directory. Change it if your Dockerfile expects a different context. For example, if your pipeline uses `path-context: python` and `dockerfile: ../Dockerfile.konflux`, run `podman build python/ -f .hermeto/Dockerfile.konflux ...` — the context is the subdirectory, but the Dockerfile remains at the repo root. Getting this wrong causes `COPY` instructions to fail with "file not found" errors.
 - The RPM `repos.d` volume mount is only needed if you use the RPM prefetcher. Omit it if you don't prefetch RPMs.
-- On Apple Silicon Macs, `uname -m` returns `arm64` but the RPM repo path uses the Linux name `aarch64`. Replace `$(uname -m)` with `aarch64` explicitly.
+- When using the RPM prefetcher on an Apple Silicon Mac, `uname -m` will produce `arm64`, but the prefetched RPM repo path uses the Linux name `aarch64`. Replace `$(uname -m)` with `aarch64` explicitly.
 
 ## Testing on Remote Architectures
 
-Konflux builds run on x86_64, aarch64, ppc64le, and s390x. Your local machine is only one of these, so to validate your hermetic build on other architectures you can run config and prefetch locally, then sync to a remote host for just the podman build. Hermeto downloads dependencies for all architectures declared in your config, so prefetch doesn't need to run on the target host. Ideally, `podman` is the only dependency needed on the remote host. See the [Beaker VM provisioning guide](beaker-vm.md) for how to get a machine on a different architecture.
+Konflux builds can run for multiple architectures. For RHOAI it is usually `x86_64` and `aarch64` to start with, and later support for `ppc64le` and `s390x`. Your local machine is only one of these, usually one of the first two.
+
+To validate your hermetic build on other architectures, you can:
+
+- figure out hermeto config and run prefetch locally
+- sync files to a remote host on a different architecture 
+- run a podman build on remote host. 
+
+Hermeto downloads dependencies for all the architectures declared in your config, so the `fetch-deps` prefetch doesn't need to run on the target host. Ideally, `podman` and `rsync` are the only dependencies needed on the remote host. See the [Beaker VM provisioning guide](beaker-vm.md) for how to use Beaker infrastructure provision a test VM on a different CPU architecture.
 
 Before syncing, make sure the following have been generated locally (see [Building with Prefetched Dependencies](#building-with-prefetched-dependencies)):
 
@@ -531,13 +539,13 @@ rsync -az --delete \
   . user@remote-host:/tmp/myproject
 ```
 
-Exclude local build artifacts and dependency caches that aren't needed on the remote host -- the hermetic build uses prefetched dependencies from `.hermeto/` instead. Remove any `--exclude` lines that don't apply to your project. Do NOT exclude `.hermeto/` -- it contains the prefetched output the build needs.
+Exclude local build artifacts and dependency caches that aren't needed on the remote host -- the hermetic build uses prefetched dependencies from `.hermeto/` instead. The `--exclude` lines in the example have been generalized to cover several package types. Do NOT exclude `.hermeto/` -- it contains the prefetched output the build needs.
 
-Then SSH in and run the `podman build` from [step 4](#4-test-locally-with-a-hermetic-build). The remote host only needs `podman` -- it doesn't need hermeto, uv, or any other tooling.
+Then, SSH in and run the `podman build` from [step 4](#4-test-locally-with-a-hermetic-build). The remote host only needs `podman` -- it should not need any other tooling.
 
 ### Container registry auth on remote hosts
 
-If your Dockerfile pulls from a private registry (e.g., `quay.io/aipcc/base-images/...`), the remote host needs credentials to pull the base image. Don't copy your full `~/.config/containers/auth.json` -- it contains tokens for every registry you've ever logged into.
+If your Dockerfile pulls from a private registry (e.g., `quay.io/aipcc/base-images/...`), the remote host needs credentials to pull the base image. Avoid copying over your entire `~/.config/containers/auth.json` -- it contains tokens for every registry you've ever logged into.
 
 **Option 1: `podman login` on the remote host**
 
@@ -552,7 +560,7 @@ Enter your Quay credentials when prompted. This creates an `auth.json` on the re
 
 **Option 2: Extract a registry-scoped auth snippet**
 
-If you can't log in interactively on the remote host (e.g., scripted provisioning), extract just the auth entry for the needed registry from your local auth file and send only that:
+You can also extract just the needed registry from your local auth file and send only that:
 
 ```bash
 # Extract only the quay.io auth entry from your local auth.json
@@ -595,9 +603,9 @@ If you're using the cookbook Makefile (see [Makefile-Based Workflow](#makefile-b
 
 ## Makefile-Based Workflow
 
-For iterative development, the cookbook provides `Makefile.hermeto-build` to automate the prefetch→sed→build pipeline. It tracks file timestamps so you can re-run individual stages without starting from scratch.
+For your convenience, the cookbook provides `Makefile.hermeto-build` to automate the prefetch→sed→build pipeline. It tracks file timestamps so you can re-run individual stages without starting from scratch.
 
-Write `hermeto-test.json` by hand (or with the skill) following the [config reference](#configuring-hermeto-testjson) above -- the config varies too much per project to automate generically.
+As a prerequisite, determine the contents of your `hermeto-test.json` following the [config reference](#configuring-hermeto-testjson) above (or with the claude skill) -- the `hermeto-test.json` config varies too much per project to automate generically.
 
 ### Setup
 
@@ -658,7 +666,7 @@ ENTRYPOINT ["python", "-m", "myapp"]
 Each `RUN` is a separate shell, so `. /cachi2/cachi2.env` must appear in every one that calls pip, cargo, npm, etc. For **Cargo + pip** projects (e.g., Python packages with Rust extensions), the env file configures both package managers at once.
 
 ## Python Requirements, AIPCC, and Source Builds
-
+[TODO is this short section even needed anymore?]
 For generating pinned requirements files, using AIPCC prebuilt wheels, and building from source on architectures that lack wheels, see the **[Python and AIPCC Guide](hermeto-python.md)**.
 
 ## RPM Dependencies
