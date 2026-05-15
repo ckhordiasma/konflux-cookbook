@@ -78,13 +78,13 @@ in the guide. Source: `konflux-central` branch `rhoai-3.5-ea.1` pipelineruns.
 
 - [x] [ai-gateway-payload-processing](https://github.com/red-hat-data-services/ai-gateway-payload-processing) — gomod + generic, 2 components (main: zero hermetic Dockerfile changes; e2e: generic fetcher for per-arch OCP client tarballs, `${TARGETARCH}` selection)
 - [x] [argo-workflows](https://github.com/red-hat-data-services/argo-workflows) — gomod + RPMs, 2 components sharing same base image, zero hermetic Dockerfile changes, shared `rpms.in.yaml` for multi-component RPM cache
-- [ ] [batch-gateway](https://github.com/red-hat-data-services/batch-gateway) — 3 components: apiserver, gc, processor
-- [ ] [data-science-pipelines](https://github.com/red-hat-data-services/data-science-pipelines) — 5 components: api-server-v2, driver, launcher, persistenceagent-v2, scheduledworkflow-v2
-- [ ] [kubeflow](https://github.com/red-hat-data-services/kubeflow) — 2 components: kf-notebook-controller, notebook-controller
-- [ ] [llm-d-inference-scheduler](https://github.com/red-hat-data-services/llm-d-inference-scheduler) — 2 components: inference-scheduler, routing-sidecar
-- [ ] [models-as-a-service](https://github.com/red-hat-data-services/models-as-a-service) — 2 components: maas-api, maas-controller
-- [ ] [odh-model-controller](https://github.com/red-hat-data-services/odh-model-controller) — 2 components: model-controller, model-serving-api
-- [ ] [rhaii-cluster-validation](https://github.com/red-hat-data-services/rhaii-cluster-validation) — 2 components: cluster-validator, validator-tools
+- [x] [batch-gateway](https://github.com/red-hat-data-services/batch-gateway) — gomod only, 3 components sharing single `go.mod`, zero hermetic Dockerfile changes
+- [x] [data-science-pipelines](https://github.com/red-hat-data-services/data-science-pipelines) — gomod + RPMs, 5 components, `replace` directives to local submodules, api-server eliminated Python compiler stage instead of hermeticizing it
+- [x] [kubeflow](https://github.com/red-hat-data-services/kubeflow) — gomod only, 2 independent Go modules in `components/` subdirectories, zero hermetic Dockerfile changes, old Cachito conditional removed
+- [x] [llm-d-inference-scheduler](https://github.com/red-hat-data-services/llm-d-inference-scheduler) — gomod + generic (empty), 2 components, zero hermetic Dockerfile changes, vestigial empty `artifacts.lock.yaml` from tarball→submodule migration
+- [x] [models-as-a-service](https://github.com/red-hat-data-services/models-as-a-service) — gomod only, 2 components with separate `go.mod` in subdirectories, different `path-context` values, zero hermetic Dockerfile changes
+- [x] [odh-model-controller](https://github.com/red-hat-data-services/odh-model-controller) — gomod only, 2 components sharing single `go.mod`, `Containerfile.server.konflux` naming, `-mod=mod` flag, zero hermetic Dockerfile changes
+- [x] [rhaii-cluster-validation](https://github.com/red-hat-data-services/rhaii-cluster-validation) — gomod + RPMs (2 entries for builder/runtime stages with different base images), committed source tarball for perftest, zero hermetic Dockerfile changes
 
 #### Partially hermetic (some components hermetic, some not)
 
