@@ -15,6 +15,62 @@ alias hermeto='podman run --rm -ti -v "$PWD:$PWD:z" -w "$PWD" \
 
 The `-v "$PWD:$PWD:z"` flag bind-mounts your project directory into the container so hermeto can read your lockfiles and write output, and `-w "$PWD"` sets the working directory to match. All `hermeto` commands in this guide assume this alias is in place.
 
+## Quick Start
+
+If your project uses a single package manager with standard lockfiles, the path is short:
+
+1. Read your Dockerfile and identify every network access point (pip install, go build, npm ci, dnf install, curl/wget)
+2. Write a `hermeto.json` config — jump to your package manager: [pip](#pip-python) | [gomod](#gomod-go) | [npm](#npm-javascript) | [cargo](#cargo-rust)
+3. Run `hermeto fetch-deps`, fix issues, repeat until it passes — see [Building with Prefetched Dependencies](#building-with-prefetched-dependencies)
+4. Test with `podman build --network none` — see [Test locally with a hermetic build](#4-test-locally-with-a-hermetic-build)
+
+For **Go** and **npm** projects, the config is often a one-liner (`{"type": "gomod", "path": "."}`) and you can skip most of the guide. The bulk of this guide covers **Python/AIPCC** and **RPM** workflows, which have significantly more complexity.
+
+## Recommended Workflow
+
+### Create a Dockerfile.konflux
+
+Start by copying your existing Dockerfile (or `Containerfile`, if your project uses the Podman naming convention) to `Dockerfile.konflux`. This is the copy you will modify for hermetic builds -- keep the original untouched so the project's existing non-hermetic build continues to work.
+
+```bash
+cp Dockerfile Dockerfile.konflux    # or: cp Containerfile Dockerfile.konflux
+```
+
+All subsequent changes in this guide (sourcing the hermeto env file, adding system packages to support hermetic installs, etc.) should be made in `Dockerfile.konflux`.
+
+### Start from the Dockerfile
+
+The Dockerfile is the source of truth for what the build needs. Before writing any hermeto config, read through the Dockerfile (and any scripts it COPYs and RUNs) and identify every point where the build pulls something from the network:
+
+- **Package manager installs** -- pip, cargo, npm, go, yarn, bundler
+- **System package installs** -- microdnf, dnf, yum
+- **Direct downloads** -- curl, wget, git clone, or any script that fetches from the internet. These can often be handled with the [generic fetcher](#generic). Alternatively, you can eliminate the download entirely: copy the binary from an existing, trusted container image via a multi-stage `COPY --from=` (e.g., kubectl from `ose-cli-rhel9`), choose a base image that already includes the tools you need, add the tool's source as a git submodule and build it from source with its own prefetch entry, or pre-commit the assets to the repo via a separate CI workflow (e.g., a GitHub Action that clones upstream repos, downloads artifacts, or runs an external build system like PNC, then commits the results so the Dockerfile can simply `COPY` them).
+
+> **Red Hat note:** Generic fetcher entries require a policy exception for productized builds. Prefer the alternatives above (multi-stage copy, base image selection, building from source) when possible.
+
+Each network access point maps to a hermeto package manager config (see [Configuring hermeto.json](#configuring-hermetojson)) or needs a manual workaround.
+
+Only network access in the Dockerfile matters. A repo may contain lockfiles (e.g., `package-lock.json` for a documentation site, or `requirements.txt` for a test suite) that are never referenced by the container build -- these do not need hermeto entries. The Dockerfile is your guide, not the repo's file listing.
+
+Multiple commands using the same package manager still map to a single hermeto entry. For example, a Dockerfile might run `npm ci` for a full install during the build stage and then `npm install --omit=dev` to prune to production dependencies. Both draw from the same prefetched cache -- hermeto prefetches everything in the lockfile, and each `npm` command finds what it needs regardless of flags like `--omit=dev` or `--ignore-scripts`.
+
+If the project has multiple Dockerfiles, identify which one is the target for hermetic builds. Also check whether the Dockerfile requires additional build inputs (argfiles, build-args, `.env` files) that affect what gets installed.[^no-deps]
+
+[^no-deps]: If your analysis finds zero network access points, you don't need hermeto at all. Set `hermetic: true` in your pipeline without `prefetch-input` — the build succeeds with nothing to prefetch. This is common for data-only containers that just COPY static files into the image.
+
+### Iterate one package manager at a time
+
+Getting a hermetic build working is an iterative process. The core loop for each package manager is:
+
+1. Add the manager to `hermeto.json` -- start with the simplest valid config (just `type` and `path`), then add options as needed (e.g., `binary` for wheels, `requirements_build_files` for sdists)
+2. Run `hermeto fetch-deps` -- expect this to fail at first while you refine the config
+3. Fix issues (missing lockfiles, wrong options, version mismatches) and re-run until fetch-deps succeeds
+4. Run a build to verify the prefetched deps actually work
+
+You can work through package managers one at a time rather than configuring everything upfront. This works because some managers (like pip) use the prefetched cache automatically once the hermeto env vars are injected into the Dockerfile -- so you can run `podman build --network none` to verify that *the current manager* is fully hermetic while other managers (like RPMs) still use the network. Once one manager is confirmed hermetic, move on to the next.
+
+Alternatively, you can configure all managers in `hermeto.json` first, get `fetch-deps` passing for everything, and then do a single full hermetic build at the end. Choose whichever approach suits the complexity of your project.
+
 ## Configuring `hermeto.json`
 
 The first step is to create a correct hermeto config. This is a JSON array of package manager objects, each with a `type` field and manager-specific options. In this guide, we save it to a file called `hermeto.json` for local testing, but in your Konflux build pipeline the JSON is typically inlined as a parameter to the prefetch task. For single-manager configs, the pipeline also accepts a bare JSON object (e.g., `{"type": "gomod", "path": "."}`) without the array wrapper.
@@ -340,51 +396,6 @@ Hermeto downloads all entries regardless of the current build architecture, so e
 ```
 
 **Java/Maven projects:** Hermeto has no native Maven package manager type. For Red Hat productized Java builds, the typical pattern is to build the artifact externally using [PNC](https://github.com/project-newcastle) (Project Newcastle), then use the generic fetcher to download the pre-built artifact into the hermetic build. A CI workflow (e.g., a GitHub Action) triggers the PNC build, extracts the artifact URL and checksum, and commits the resulting `artifacts.lock.yaml`. The Dockerfile.konflux then just unpacks the pre-built artifact — no `mvn` or `gradle` runs inside the container at all. See [trustyai-explainability](https://github.com/red-hat-data-services/trustyai-explainability/tree/rhoai-3.5-ea.1) for a working example of this pattern.
-
-## Recommended Workflow
-
-### Create a Dockerfile.konflux
-
-Start by copying your existing Dockerfile (or `Containerfile`, if your project uses the Podman naming convention) to `Dockerfile.konflux`. This is the copy you will modify for hermetic builds -- keep the original untouched so the project's existing non-hermetic build continues to work.
-
-```bash
-cp Dockerfile Dockerfile.konflux    # or: cp Containerfile Dockerfile.konflux
-```
-
-All subsequent changes in this guide (sourcing the hermeto env file, adding system packages to support hermetic installs, etc.) should be made in `Dockerfile.konflux`.
-
-### Start from the Dockerfile
-
-The Dockerfile is the source of truth for what the build needs. Before writing any hermeto config, read through the Dockerfile (and any scripts it COPYs and RUNs) and identify every point where the build pulls something from the network:
-
-- **Package manager installs** -- pip, cargo, npm, go, yarn, bundler
-- **System package installs** -- microdnf, dnf, yum
-- **Direct downloads** -- curl, wget, git clone, or any script that fetches from the internet. These can often be handled with the [generic fetcher](#generic). Alternatively, you can eliminate the download entirely: copy the binary from an existing, trusted container image via a multi-stage `COPY --from=` (e.g., kubectl from `ose-cli-rhel9`), choose a base image that already includes the tools you need, add the tool's source as a git submodule and build it from source with its own prefetch entry, or pre-commit the assets to the repo via a separate CI workflow (e.g., a GitHub Action that clones upstream repos, downloads artifacts, or runs an external build system like PNC, then commits the results so the Dockerfile can simply `COPY` them).
-
-> **Red Hat note:** Generic fetcher entries require a policy exception for productized builds. Prefer the alternatives above (multi-stage copy, base image selection, building from source) when possible.
-
-Each network access point maps to a hermeto package manager config (see [Configuring hermeto.json](#configuring-hermetojson)) or needs a manual workaround.
-
-Only network access in the Dockerfile matters. A repo may contain lockfiles (e.g., `package-lock.json` for a documentation site, or `requirements.txt` for a test suite) that are never referenced by the container build -- these do not need hermeto entries. The Dockerfile is your guide, not the repo's file listing.
-
-Multiple commands using the same package manager still map to a single hermeto entry. For example, a Dockerfile might run `npm ci` for a full install during the build stage and then `npm install --omit=dev` to prune to production dependencies. Both draw from the same prefetched cache -- hermeto prefetches everything in the lockfile, and each `npm` command finds what it needs regardless of flags like `--omit=dev` or `--ignore-scripts`.
-
-If the project has multiple Dockerfiles, identify which one is the target for hermetic builds. Also check whether the Dockerfile requires additional build inputs (argfiles, build-args, `.env` files) that affect what gets installed.[^no-deps]
-
-[^no-deps]: If your analysis finds zero network access points, you don't need hermeto at all. Set `hermetic: true` in your pipeline without `prefetch-input` — the build succeeds with nothing to prefetch. This is common for data-only containers that just COPY static files into the image.
-
-### Iterate one package manager at a time
-
-Getting a hermetic build working is an iterative process. The core loop for each package manager is:
-
-1. Add the manager to `hermeto.json` -- start with the simplest valid config (just `type` and `path`), then add options as needed (e.g., `binary` for wheels, `requirements_build_files` for sdists)
-2. Run `hermeto fetch-deps` -- expect this to fail at first while you refine the config
-3. Fix issues (missing lockfiles, wrong options, version mismatches) and re-run until fetch-deps succeeds
-4. Run a build to verify the prefetched deps actually work
-
-You can work through package managers one at a time rather than configuring everything upfront. This works because some managers (like pip) use the prefetched cache automatically once the hermeto env vars are injected into the Dockerfile -- so you can run `podman build --network none` to verify that *the current manager* is fully hermetic while other managers (like RPMs) still use the network. Once one manager is confirmed hermetic, move on to the next.
-
-Alternatively, you can configure all managers in `hermeto.json` first, get `fetch-deps` passing for everything, and then do a single full hermetic build at the end. Choose whichever approach suits the complexity of your project.
 
 ## Building with Prefetched Dependencies
 
