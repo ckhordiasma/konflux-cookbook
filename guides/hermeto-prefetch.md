@@ -859,7 +859,7 @@ uv pip compile pyproject.toml \
 
 > **Why `--default-index` instead of `--index`?** The `--default-index` flag replaces PyPI as the primary index, so `--emit-index-url` emits it as the `--index-url` directive in the output. If you use `--index` instead, uv treats it as a supplementary index and PyPI remains the default — `--emit-index-url` then emits PyPI as `--index-url` and your custom index as `--extra-index-url`, which causes hermeto (and pip) to prefer PyPI over AIPCC.
 
-If your requirements pin AIPCC-specific versions with release suffixes like `vllm==0.18.0+rhaiv.4`, you need to tell `uv` to allow pre-releases — it treats the `+rhaiv` local version segment as a pre-release and skips it by default. Prefer `--prerelease=if-necessary` over `--prerelease=allow`:
+If your requirements pin AIPCC-specific versions with local version segments like `vllm==0.18.0+rhaiv.4`, you need to tell `uv` to allow them — uv skips versions with local segments by default. Prefer `--prerelease=if-necessary` over `--prerelease=allow`:
 
 - **`--prerelease=if-necessary`** — only uses a pre-release when no stable version satisfies the constraint. This is safer for multi-arch builds because it avoids pulling release candidates that may only have wheels for a subset of architectures.
 - **`--prerelease=allow`** — allows pre-releases for all packages, which can pull RC versions (e.g., `safetensors==0.8.0rc0`) that have wheels on some architectures but not others, causing builds to fail on the missing arch.
