@@ -53,11 +53,9 @@ Other parameters you may need to update:
 
 ### Step 2: Run the ODH Konflux Onboarder
 
-Once your odh-konflux-central PR is merged, run the ODH Konflux onboarder <TODO link to the workflow>. Select your repo and choose the branch that your CI builds run from (usually `main`). Set the build type to CI and leave the rest blank.
+Once your odh-konflux-central PR is merged, run the [ODH Konflux onboarder workflow](https://github.com/opendatahub-io/odh-konflux-central/actions/workflows/odh-konflux-onboarder.yml). Select your component, choose the branch that your CI builds run from (usually `main`), set the build type to CI, and leave the rest blank.
 
-The onboarder creates a PR in your midstream repo with the PipelineRun configuration you added to odh-konflux-central <TODO check workflow logs and find an example PR that gets produced>.
-
-<TODO add a blurb about the $VAR$ variables used in odh konflux central>
+The onboarder substitutes template variables in your PipelineRun files (`$$TARGET_BRANCH$$`, `$$OUTPUT_IMAGE_TAG$$`, etc.) and opens a PR in your midstream repo with the resulting `.tekton/` files. For example, see [opendatahub-io/kserve#1500](https://github.com/opendatahub-io/kserve/pull/1500) for what a CI onboarding PR looks like.
 
 From here, you have two approaches:
 
@@ -71,7 +69,7 @@ From here, you have two approaches:
 
 Whether you're iterating on the onboarder's PR (Approach A) or on a follow-up PR (Approach B), each push triggers a Konflux pull request build. Watch the build in the Konflux web UI to verify your hermetic build works.
 
-If you need to tweak the PipelineRun itself during iteration (e.g., adjusting your hermeto config in `prefetch-input`, changing the Dockerfile path, or modifying build parameters), you will also need to backport those changes to odh-konflux-central. The PipelineRun in your component repo was generated from odh-konflux-central, and any subsequent ODH releases will use the PipelineRun as defined in odh-konflux-central, so the two need to stay in sync. <TODO word this sentence a bit better>
+If you need to tweak the PipelineRun itself during iteration (e.g., adjusting your hermeto config in `prefetch-input`, changing the Dockerfile path, or modifying build parameters), backport those changes to odh-konflux-central as well. The onboarder generates `.tekton/` files from odh-konflux-central for both CI builds (on `main`) and release builds (on release branches). If your component repo's `.tekton/` files drift from what's in odh-konflux-central, the next onboarding run -- whether for a CI sync or a new release -- will overwrite your changes.
 
 ### Step 4: Find Your Build Image
 
@@ -122,13 +120,25 @@ Check the annotations at the top of the pull request PipelineRun. It should incl
 
 - **Comment trigger** -- add the appropriate comment to your PR (e.g., `/build-konflux`) for a one-off build
 - **Label trigger** -- add the appropriate label to your PR to trigger a build on each push
-<TODO mention something about the fips check - ask me for more context>
 
-### Step 4: Conforma Validation
-[TODO conforma validation via IntegrationTestScenario (what this section describes) doesn't actually
- happen on the main branch - it only happens on the release branches. replace this section with someting similar to the local conforma testing section that we have for ODH]
+**FIPS check:** The RHDS build pipeline runs `check-payload` as a post-build step to verify FIPS compatibility. If check-payload fails, the entire build pipeline fails. A `fips-check-blocking` PipelineRun param exists that can bypass this failure -- **do not disable this.** Bypassing the FIPS check requires an explicit exception approved by RHOAI product management. If your build is failing the FIPS check, fix the underlying issue rather than turning off the gate.
 
-If the PR build succeeds, a second pipeline triggers automatically that checks the built image against the RHOAI production Conforma policy. Review the results and address any failures before merging -- these same checks gate the release pipeline, so fixing them now avoids blocking later.
+### Step 4: Validate with Conforma
+
+Conforma validation via IntegrationTestScenario runs automatically on release branches but not on `main`. To catch policy issues early, run the built image from your PR build against the production RHOAI Conforma policy manually:
+
+```bash
+ec validate image \
+  --ignore-rekor true \
+  --image <image-uri-from-pr-build> \
+  --public-key k8s://openshift-pipelines/public-key \
+  --policy rhtap-releng-tenant/registry-rhoai-prod \
+  --info \
+  --output yaml \
+  --timeout 30m0s
+```
+
+Find the image URI in the **Results** section of your PipelineRun in the Konflux web UI (`IMAGE_URL` and `IMAGE_DIGEST`). See the [Conforma validation guide](test-conforma.md) for the full walkthrough.
 
 ### Step 5: Sync Changes Back to RHDS Konflux-Central
 
@@ -139,4 +149,11 @@ Once your PR is merged, you need to update two PipelineRun specs in the RHDS kon
 
 This is necessary because RHDS konflux-central pushes pipeline changes directly to component repos. If you don't sync your changes back, the next pipeline sync from konflux-central will overwrite your updates.
 
-<TODO instructions on where to go in the konflux web ui to make sure their builds are happening on the release branch>
+### Step 6: Verify Release Branch Builds
+
+Once your changes are synced to the release branch (via konflux-central), verify that production builds are running correctly:
+
+1. Open the [Konflux web UI](https://console.redhat.com/application-pipeline)
+2. Navigate to your application and component
+3. Check the **Activity** tab for recent PipelineRuns on the release branch
+4. Confirm the build completes successfully with your hermetic build configuration
