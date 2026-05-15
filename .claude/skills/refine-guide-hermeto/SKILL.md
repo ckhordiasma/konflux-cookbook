@@ -14,6 +14,8 @@ Read `guides/hermeto-prefetch.md` (relative to the plugin root) thoroughly befor
 
    **Parallel analysis:** When the user asks to analyze multiple repos (e.g., "check all AIPCC repos"), spawn background agents to analyze each repo concurrently. Each agent should perform steps 2–5 independently and return its findings. Keep the main context free for synthesis — do not duplicate the agents' analysis work in the main thread.
 
+   Before spawning agents, read `guides/hermeto-prefetch.md` once and include its content in each agent's prompt. This eliminates redundant file reads — each agent gets the guide inline rather than reading it from disk independently. The guide is the reference for step 5 (walking through sections to compare against the implementation).
+
 2. **Find and parse PipelineRuns**: List `.tekton/*.yaml` files in the cloned repo. If there is only one push pipeline, proceed with it directly. If there are multiple, present them to the user and ask which push pipeline(s) to analyze. For each selected pipeline, extract:
    - `hermetic` flag (true/false)
    - `prefetch-input` (the hermeto config JSON)
@@ -53,7 +55,7 @@ Read `guides/hermeto-prefetch.md` (relative to the plugin root) thoroughly befor
    - Git LFS objects — large binaries committed via LFS that replace runtime downloads (check `.gitattributes` for LFS-tracked paths)
    - Note which files exist at the repo root vs in subdirectories (important for monorepos with multiple components)
 
-5. **Walk through the guide**: Read `guides/hermeto-prefetch.md` and simulate following it step-by-step for this repo. For each section of the guide, check whether it would lead a reader to the same implementation:
+5. **Walk through the guide**: Using the guide content (from `guides/hermeto-prefetch.md` — provided in the agent prompt during parallel runs, or read directly for single-repo runs), simulate following it step-by-step for this repo. For each section of the guide, check whether it would lead a reader to the same implementation:
 
    - **"Create a Dockerfile.konflux"**: Does the guide's advice to copy and modify the Dockerfile match what the developer actually did? Were there structural changes the guide doesn't mention (e.g., workspace restructuring, base image swaps)?
    - **"Start from the Dockerfile"**: Does the guide's instruction to "identify every network access point" produce the same list of package managers as the `prefetch-input`? Would a reader of the guide know how to handle this repo's specific setup (monorepo, multi-stage builds, multiple components)?
