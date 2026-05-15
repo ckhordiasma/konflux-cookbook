@@ -9,6 +9,12 @@
 - [x] Document `-test` index variants (e.g., `cpu-ubi9-test/simple/`) that carry midstream/pre-release builds like `vllm==0.18.0+rhaiv.4` — found in llm-d-kv-cache and llama-stack-provider repos
 - [x] Clarify the two URL prefixes (`console.redhat.com` vs `packages.redhat.com`) — both work, repos use them interchangeably
 
+## Hermetic Builds — Open Questions
+
+- [ ] Search all Rust-based builds in RHOAI to confirm that installing `rust-toolset` RPM into a UBI9 base is the standard pattern (no dedicated Rust builder image exists)
+
+- [ ] Verify Makefile.hermeto-build is consistent with the manual steps documented in the hermeto-prefetch guide (generate-env, sed injection, inject-files, podman build)
+
 ## Dockerfile.konflux Best Practices
 
 - [ ] Guide on creating a Dockerfile.konflux from an upstream Dockerfile
