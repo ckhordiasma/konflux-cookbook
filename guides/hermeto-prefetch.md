@@ -1039,6 +1039,17 @@ context:
 
 If components use different base images (e.g., one uses `ubi9/go-toolset` and another uses `ubi9/python-312`), you need separate `rpms.in.yaml` and `rpms.lock.yaml` files because the available repos differ by base image. Place each pair in its own subdirectory with its own `containerfile` reference, and point each component's pipeline at the right one with `{"type": "rpm", "path": "<subdir>"}` — the `path` is a directory, and hermeto always looks for `rpms.lock.yaml` in it.
 
+**Multi-stage RPM resolution:** The same applies within a single component when different Dockerfile stages install packages from different base images (e.g., an AIPCC CUDA builder stage and a UBI runtime stage). Create separate `rpms.in.yaml`/`rpms.lock.yaml` pairs in different subdirectories, each with its own `containerfile` targeting the appropriate stage via `stageName`. List both in the component's `prefetch-input`:
+
+```json
+[
+  {"type": "rpm", "path": "tools"},
+  {"type": "rpm", "path": "tools/builder"}
+]
+```
+
+Where `tools/rpms.in.yaml` targets the runtime stage (using `ubi.repo`) and `tools/builder/rpms.in.yaml` targets the builder stage (using a different repo source like `redhat.repo` for entitlement-based RHEL repos). See [rhaii-cluster-validation](https://github.com/red-hat-data-services/rhaii-cluster-validation/tree/rhoai-3.5-ea.1) for a working example.
+
 The `contentOrigin` section can also be inlined instead of referencing a repo file. Include CodeReady Builder repos if you need packages like `ninja-build` that aren't in baseos or appstream:
 
 ```yaml
