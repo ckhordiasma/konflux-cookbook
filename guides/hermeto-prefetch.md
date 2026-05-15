@@ -23,7 +23,7 @@ If your project uses a single package manager with standard lockfiles, the path 
 
 1. Read your Dockerfile and identify every network access point (pip install, go build, npm ci, dnf install, curl/wget)
 2. Write a `hermeto-test.json` config — jump to your package manager: [pip](#pip-python) | [gomod](#gomod-go) | [npm](#npm-javascript) | [cargo](#cargo-rust)
-3. Run `hermeto fetch-deps`, fix issues, repeat until it passes — see [Building with Prefetched Dependencies](#building-with-prefetched-dependencies)
+3. Run `hermeto fetch-deps`, fix issues, repeat until it passes — see [Building with Prefetched Dependencies](#building-with-prefetched-dependencies) (or use the [Makefile](#makefile-based-workflow) to automate steps 3–4)
 4. Test with `podman build --network none` — see [Test locally with a hermetic build](#4-test-locally-with-a-hermetic-build)
 5. Copy the contents of `hermeto-test.json` into your `.tekton/` PipelineRun `prefetch-input` parameter — see [What to Commit](#what-to-commit)
 
@@ -69,9 +69,9 @@ Only network access in the Dockerfile matters. A repo may contain lockfiles (e.g
 
 Multiple commands using the same package manager still map to a single hermeto entry. For example, a Dockerfile might run `npm ci` for a full install during the build stage and then `npm install --omit=dev` to prune to production dependencies. Both draw from the same prefetched cache -- hermeto prefetches everything in the lockfile, and each `npm` command finds what it needs regardless of flags like `--omit=dev` or `--ignore-scripts`.
 
-If the project has multiple Dockerfiles, identify which one is the target for hermetic builds. Also check whether the Dockerfile requires additional build inputs (argfiles, build-args, `.env` files) that affect what gets installed.[^no-deps]
+If the project has multiple Dockerfiles, identify which one is the target for hermetic builds. Also check whether the Dockerfile requires additional build inputs (argfiles, build-args, `.env` files) that affect what gets installed.
 
-[^no-deps]: If your analysis finds zero network access points, you don't need hermeto at all. Set `hermetic: true` in your pipeline without `prefetch-input` — the build succeeds with nothing to prefetch. This is common for data-only containers that just COPY static files into the image.
+> **Zero network access points?** You don't need hermeto at all. Set `hermetic: true` in your pipeline without `prefetch-input` — the build succeeds with nothing to prefetch. This is common for data-only containers that just COPY static files into the image.
 
 ### Iterate one package manager at a time
 
@@ -412,7 +412,9 @@ Hermeto downloads all entries regardless of the current build architecture, so e
 {"type": "generic", "path": "."}
 ```
 
-**Java/Maven projects:** Hermeto has no native Maven package manager type. For Red Hat productized Java builds, the typical pattern is to build the artifact externally using [PNC](https://github.com/project-newcastle) (Project Newcastle), then use the generic fetcher to download the pre-built artifact into the hermetic build. A CI workflow (e.g., a GitHub Action) triggers the PNC build, extracts the artifact URL and checksum, and commits the resulting `artifacts.lock.yaml`. The Dockerfile.konflux then just unpacks the pre-built artifact — no `mvn` or `gradle` runs inside the container at all. See [trustyai-explainability](https://github.com/red-hat-data-services/trustyai-explainability/tree/rhoai-3.5-ea.1) for a working example of this pattern.
+#### Java/Maven projects
+
+Hermeto has no native Maven package manager type. For Red Hat productized Java builds, the typical pattern is to build the artifact externally using [PNC](https://github.com/project-newcastle) (Project Newcastle), then use the generic fetcher to download the pre-built artifact into the hermetic build. A CI workflow (e.g., a GitHub Action) triggers the PNC build, extracts the artifact URL and checksum, and commits the resulting `artifacts.lock.yaml`. The Dockerfile.konflux then just unpacks the pre-built artifact — no `mvn` or `gradle` runs inside the container at all. See [trustyai-explainability](https://github.com/red-hat-data-services/trustyai-explainability/tree/rhoai-3.5-ea.1) for a working example of this pattern.
 
 ## Building with Prefetched Dependencies
 
@@ -453,7 +455,7 @@ sed -E \
   Dockerfile.konflux > .hermeto/Dockerfile.konflux
 ```
 
-The regex matches every `RUN` instruction — including those with flags like `RUN --mount=type=cache ...` — and prepends `. /cachi2/cachi2.env &&` so the environment is sourced before each command. This produces `.hermeto/Dockerfile.konflux` with the env file sourced in every `RUN`, leaving your original Dockerfile untouched. Use this generated Dockerfile for the local hermetic build in step 4.
+This regex is intentionally identical to the one used in the [Konflux buildah task](https://github.com/konflux-ci/build-definitions/blob/44ffba6bd5e8a3da0511b13677b3a0982ae6722e/task/buildah-oci-ta/0.8/buildah-oci-ta.yaml#L749-L754) so that local testing matches production behavior exactly. It matches every `RUN` instruction — including those with flags like `RUN --mount=type=cache ...` — and prepends `. /cachi2/cachi2.env &&` so the environment is sourced before each command. This produces `.hermeto/Dockerfile.konflux` with the env file sourced in every `RUN`, leaving your original Dockerfile untouched. Use this generated Dockerfile for the local hermetic build in step 4.
 
 > **macOS note:** The `M` (multiline) flag in the sed command above is a GNU extension. macOS ships BSD sed, which does not support it. Install GNU sed with `brew install gnu-sed` and use `gsed` instead of `sed`.
 
@@ -529,12 +531,8 @@ If you can't log in interactively on the remote host (e.g., scripted provisionin
 
 ```bash
 # Extract only the quay.io auth entry from your local auth.json
-python3 -c "
-import json, sys
-auth = json.load(open(sys.argv[1]))
-scoped = {'auths': {k: v for k, v in auth['auths'].items() if 'quay.io' in k}}
-json.dump(scoped, sys.stdout, indent=2)
-" ~/.config/containers/auth.json > /tmp/quay-auth.json
+jq '{auths: (.auths | with_entries(select(.key | contains("quay.io"))))}' \
+  ~/.config/containers/auth.json > /tmp/quay-auth.json
 
 # Copy the scoped file to the remote host
 scp /tmp/quay-auth.json root@remote-host:~/.config/containers/auth.json
@@ -608,9 +606,9 @@ make -f Makefile.hermeto-build build       # full offline podman build (runs pre
 make -f Makefile.hermeto-build clean       # remove .hermeto/ and .hermeto.env
 ```
 
-## Dockerfile Reference
+## Dockerfile Reference (build-time only — do not commit)
 
-For reference, here is what the Dockerfile looks like *after* the pipeline's automatic sed injection. This is not what you commit -- it shows the transformed version that runs at build time (and what the local testing sed command in [step 2](#2-generate-the-environment-file-and-modify-the-dockerfile) produces):
+For reference, here is what the Dockerfile looks like *after* the pipeline's automatic sed injection. This is the transformed version that runs at build time (and what the local testing sed command in [step 2](#2-generate-the-environment-file-and-modify-the-dockerfile) produces) — your committed Dockerfile.konflux should NOT contain the `. /cachi2/cachi2.env &&` lines:
 
 ```dockerfile
 FROM registry.access.redhat.com/ubi9/python-312-minimal AS base

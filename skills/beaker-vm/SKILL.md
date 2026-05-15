@@ -20,4 +20,4 @@ Read `guides/beaker-vm.md` (relative to the plugin root) thoroughly before start
 
 4. **Monitor and connect**: Follow the "Monitoring your job" section in the guide. Help the user watch the job and retrieve the hostname once provisioned.
 
-5. **Next steps**: If the user is provisioning for hermetic build testing, point them to the [Testing on Remote Architectures](guides/hermeto-prefetch.md#testing-on-remote-architectures) section in the hermeto guide.
+5. **Next steps**: If the user is provisioning for hermetic build testing, point them to the "Testing on Remote Architectures" section in `guides/hermeto-prefetch.md`.

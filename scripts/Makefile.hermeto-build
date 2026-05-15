@@ -81,6 +81,7 @@ check-sed:
 $(HERMETO_SENTINEL): $(HERMETO_CONFIG)
 	rm -rf $(HERMETO_OUTPUT) && mkdir $(HERMETO_OUTPUT)
 	$(HERMETO) fetch-deps --source . --output $(HERMETO_OUTPUT) $(HERMETO_CONFIG)
+	# Safe to run for all package managers; no-op for pip and rpm
 	$(HERMETO) inject-files ./$(HERMETO_OUTPUT) --for-output-dir /cachi2/output
 
 $(HERMETO_ENV): $(HERMETO_SENTINEL)
