@@ -32,6 +32,7 @@ konflux-cookbook/
 |-------|-------------|
 | [create-pr-pipeline](guides/create-pr-pipeline.md) | Create a temporary pull request PipelineRun from a push PipelineRun to test build changes on an RHOAI release branch |
 | [test-conforma](guides/test-conforma.md) | Run Conforma (Enterprise Contract) validation against a single image or Konflux snapshot to check release policy compliance |
+| [hermeto-prefetch](guides/hermeto-prefetch.md) | Set up hermetic builds with Hermeto (pre-fetch dependencies for offline container builds) |
 | [beaker-vm](guides/beaker-vm.md) | Provision a VM on Beaker for multi-arch build testing |
 
 ## Using as a Claude Code plugin
