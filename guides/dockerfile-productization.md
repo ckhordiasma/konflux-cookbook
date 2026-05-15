@@ -1,5 +1,4 @@
 # Dockerfile Productization for Konflux
-<!--TODO - switch all reference to files on github to sha-pinned references -->
 > **Scope:** This guide is specific to Red Hat productization, and more specifically to **OpenShift AI (RHOAI)** components being built through Konflux. Other Red Hat products follow similar patterns but may differ in details (base image choices, compliance requirements, etc.). If you're working on a non-RHOAI product, use this as a starting point but verify the specifics with your product's build team.
 
 ## What is a Dockerfile.konflux
@@ -20,8 +19,8 @@ cp Dockerfile Dockerfile.konflux    # or: cp Containerfile Dockerfile.konflux
 
 If the repo has a three-layer Dockerfile structure (upstream → midstream → Dockerfile.konflux), derive your Dockerfile.konflux from the **midstream** variant, not the upstream. Common midstream names include `Dockerfile.rhoai`, `Dockerfile.odh`, or product-specific variants. Examples:
 
-- [trainer](https://github.com/red-hat-data-services/trainer/tree/rhoai-3.5-ea.1/cmd/trainer-controller-manager): `Dockerfile` → `Dockerfile.odh` → `Dockerfile.rhoai.konflux`
-- [rhods-operator](https://github.com/red-hat-data-services/rhods-operator/tree/rhoai-3.5-ea.1/Dockerfiles): `Dockerfile` → `rhoai.Dockerfile` → `Dockerfile.konflux`
+- [trainer](https://github.com/red-hat-data-services/trainer/tree/138f5c9d590be0e7aa548798b20ae1b2fa5ac6b9/cmd/trainer-controller-manager): `Dockerfile` → `Dockerfile.odh` → `Dockerfile.rhoai.konflux`
+- [rhods-operator](https://github.com/red-hat-data-services/rhods-operator/tree/211330c4d8ad87e36628d6bb0a3edf3394c1c83a/Dockerfiles): `Dockerfile` → `rhoai.Dockerfile` → `Dockerfile.konflux`
 
 The midstream Dockerfile typically already has Red Hat-specific changes (base images, labels, feature flags) that you'd otherwise have to redo.
 
@@ -69,8 +68,6 @@ skopeo inspect docker://registry.access.redhat.com/ubi9/ubi-minimal:9.4 \
 
 **Renovate will keep digests current.** Once you pin by digest, Renovate (configured in the repo) automatically opens PRs to update digests when new image versions are published. It scans `FROM` lines for digest pins and creates update PRs. If you use `ARG BASE_IMAGE=...@sha256:...` + `FROM ${BASE_IMAGE}` instead of a direct `FROM`, you may need renovate config changes to keep automated updates working — check with the build team.
 
-<!-- TODO add a TODO.md about expanding this section to cover strategies to renovate an argfile instead of the Dockerfile -->
-
 ### Removing `--platform` from FROM
 
 Upstream Dockerfiles sometimes include `--platform` flags on `FROM` lines to force a specific architecture during local development or cross-compilation:
@@ -80,9 +77,13 @@ Upstream Dockerfiles sometimes include `--platform` flags on `FROM` lines to for
 FROM --platform=$BUILDPLATFORM golang:1.22 AS builder
 ```
 
-Remove `--platform` flags from all `FROM` lines in `Dockerfile.konflux`. Konflux builds run natively on each target architecture (x86_64, aarch64, ppc64le, s390x), so the platform is determined by the build environment, not the Dockerfile. Keeping `--platform` can cause the build to pull the wrong architecture image.
-<!-- TODO check the buildah remote definition in the konflux build-definitions repo - might be able to leave this if it is set to an ARG that buildah injects into multi arch build. Also not sure the interaction between specifying --platform and when the image is sha-pinned to a manifest digest -->
-See [data-science-pipelines-operator Dockerfile.konflux](https://github.com/red-hat-data-services/data-science-pipelines-operator/blob/rhoai-3.5-ea.1/Dockerfile.konflux) for an example.
+Remove `--platform` flags from `FROM` lines in `Dockerfile.konflux`. Konflux multi-platform builds use the [multi-platform-controller](https://github.com/konflux-ci/multi-platform-controller) to provision architecture-native VMs for each target (x86_64, aarch64, ppc64le, s390x), then run `buildah build` natively on each. Since each architecture builds on native hardware, `FROM` lines without `--platform` will naturally pull the correct architecture from a manifest list digest.
+
+The Docker cross-compilation pattern (`FROM --platform=$BUILDPLATFORM` in a builder stage to run build tools at host speed, cross-compiling for `$TARGETPLATFORM`) doesn't apply in Konflux since builds already run natively on the target architecture. Leaving `--platform=$BUILDPLATFORM` in a `FROM` line is harmless (buildah's [imagebuilder library](https://github.com/openshift/imagebuilder/blob/master/dispatchers.go#L40-L49) automatically sets `$BUILDPLATFORM` to the host platform), but it's misleading — the Dockerfile isn't cross-compiling, so removing it makes the intent clearer.
+
+**`TARGETARCH` and `TARGETOS` are available and work correctly.** Buildah automatically sets `TARGETARCH`, `TARGETOS`, `TARGETPLATFORM`, `BUILDARCH`, `BUILDOS`, and `BUILDPLATFORM` to the host platform's values, even without a `--platform` flag. Since Konflux builds run natively on each architecture, `TARGETARCH` resolves to the correct value (e.g., `amd64` on x86_64 VMs, `arm64` on aarch64 VMs). Using `ARG TARGETARCH` in your Dockerfile for arch-specific build logic (like `GOARCH=${TARGETARCH}`) works as expected.
+
+See [data-science-pipelines-operator Dockerfile.konflux](https://github.com/red-hat-data-services/data-science-pipelines-operator/blob/c4e9d9d5198f9f7a4ff0ab00d64bad3293f93e4d/Dockerfile.konflux) for an example.
 
 ### ubi9-micro vs ubi9-minimal
 
@@ -90,15 +91,32 @@ Use `ubi9-minimal` if your Dockerfile has any `RUN` instructions. `ubi9-micro` l
 
 If your image truly needs no `RUN` instructions (a pure `COPY`-based image), `ubi9-micro` is fine and produces smaller images. But this is rare — most production images need at least one `RUN` for permissions, directory creation, or similar setup.
 
-See [models-perf-benchmark-data Dockerfile.konflux](https://github.com/red-hat-data-services/models-perf-benchmark-data/blob/rhoai-3.5-ea.1/Dockerfile.konflux) for a `ubi9-minimal` example.
+See [models-perf-benchmark-data Dockerfile.konflux](https://github.com/red-hat-data-services/models-perf-benchmark-data/blob/c3fdbfbdb43f923c53c64a580a1be9172faeb9bf/Dockerfile.konflux) for a `ubi9-minimal` example.
 
-<!-- TODO need to add a section about having the final stage be minimal -->
+### Keep the Final Stage Minimal
+
+Use multi-stage builds to keep the final image lean. Build toolchains (compilers, dev headers, Go toolsets) should live in builder stages, with only the compiled artifacts copied into the final stage. The final stage should use the smallest viable base image — `ubi9-minimal` for most cases, `ubi9-micro` for pure `COPY`-based images.
+
+```dockerfile
+# Builder — has all the build tools
+FROM registry.access.redhat.com/ubi9/go-toolset:1.22@sha256:abc... AS builder
+COPY . /src
+RUN go build -o /binary ./cmd/...
+
+# Final — minimal runtime only
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.4@sha256:def...
+COPY --from=builder /binary /usr/local/bin/binary
+USER 1001
+ENTRYPOINT ["/usr/local/bin/binary"]
+```
+
+A smaller final image reduces attack surface, speeds up pull times, and makes security scanning faster. Avoid installing build-time-only packages (gcc, make, *-devel) in the final stage — if the runtime needs a shared library, install just the runtime package, not the development headers.
 
 ## Build-arg Simplification
 
 Upstream Dockerfiles often use `ARG` to parameterize builds across multiple variants (dev/staging/prod, different Python versions, optional features). For `Dockerfile.konflux`, hardcode the production values directly.
 
-<!-- TODO I think this is not a good practice, but just what we have been doing. Teams should be able to specify an args file as a tekton parameter instead. -->
+> **Note:** Hardcoding build args is common practice today, but not necessarily ideal. The Konflux pipeline supports a `build-arg-file` parameter that lets you externalize build args into a separate file (e.g., `.build-args`). This keeps the Dockerfile cleaner and puts all variant-specific values in one place. If your project has many args or shares a Dockerfile across products, consider using `build-arg-file` instead of hardcoding. The tradeoff is that Renovate doesn't currently scan argfiles for digest updates — you'd need custom renovate config or manual updates for pinned values in the argfile.
 
 ```dockerfile
 # Upstream — parameterized for flexibility
@@ -129,7 +147,7 @@ RUN if [ "$FIPS_ENABLED" = "true" ]; then \
 RUN <fips setup>
 ```
 
-See [data-science-pipelines-operator Dockerfile](https://github.com/red-hat-data-services/data-science-pipelines-operator/blob/rhoai-3.5-ea.1/Dockerfile) vs [Dockerfile.konflux](https://github.com/red-hat-data-services/data-science-pipelines-operator/blob/rhoai-3.5-ea.1/Dockerfile.konflux) for a before/after.
+See [data-science-pipelines-operator Dockerfile](https://github.com/red-hat-data-services/data-science-pipelines-operator/blob/c4e9d9d5198f9f7a4ff0ab00d64bad3293f93e4d/Dockerfile) vs [Dockerfile.konflux](https://github.com/red-hat-data-services/data-science-pipelines-operator/blob/c4e9d9d5198f9f7a4ff0ab00d64bad3293f93e4d/Dockerfile.konflux) for a before/after.
 
 ### Go FIPS Builds
 
@@ -145,46 +163,27 @@ All three pieces are required:
 - `-tags strictfipsruntime` — includes FIPS-specific source files at compile time
 - `CGO_ENABLED=1` — BoringCrypto requires cgo; static-only builds won't link to the FIPS module
 
-See [ogx-k8s-operator Dockerfile](https://github.com/red-hat-data-services/ogx-k8s-operator/blob/rhoai-3.5-ea.1/Dockerfile) for the full pattern, and [odh-cli Dockerfile.konflux](https://github.com/red-hat-data-services/odh-cli/blob/rhoai-3.5-ea.1/Dockerfile.konflux) for applying it to submodule builds.
+See [ogx-k8s-operator Dockerfile](https://github.com/red-hat-data-services/ogx-k8s-operator/blob/bf732614a7e78c5477422d137360d2f1b3a895cf/Dockerfile) for the full pattern, and [odh-cli Dockerfile.konflux](https://github.com/red-hat-data-services/odh-cli/blob/f4e654f16c63300a9ba5e197e953aae26b41635c/Dockerfile.konflux) for applying it to submodule builds.
 
 ## Eliminating Network Downloads
-<!-- TODO just have it refer to the section in the hermetic guide -->
+
 Any `curl`, `wget`, `git clone`, or similar download in the Dockerfile must be replaced. Hermetic builds have no network access, and even before hermeticization, direct downloads are problematic for reproducibility and SBOM completeness.
 
-Replacement strategies, from most to least preferred:
-
-1. **Choose a base image that includes the tool** — if you need `kubectl` and `oc`, use `ose-cli-rhel9` as your base image instead of installing them separately. See [odh-cli Dockerfile.konflux](https://github.com/red-hat-data-services/odh-cli/blob/rhoai-3.5-ea.1/Dockerfile.konflux).
-
-2. **Multi-stage `COPY --from=` from a trusted image** — copy the binary from an existing Red Hat image in a builder stage:
-
-   ```dockerfile
-   FROM registry.redhat.io/openshift4/ose-cli-rhel9:v4.16@sha256:abc... AS ose-cli
-   FROM registry.access.redhat.com/ubi9/ubi-minimal:9.4@sha256:def... AS final
-   COPY --from=ose-cli /usr/bin/kubectl /usr/local/bin/kubectl
-   ```
-
-   See [must-gather Dockerfile.konflux](https://github.com/red-hat-data-services/must-gather/blob/rhoai-3.5-ea.1/Dockerfile.konflux) for a real example.
-
-3. **Build from source via git submodule** — add the tool's source as a git submodule and build it in a builder stage. See [odh-cli yq-builder](https://github.com/red-hat-data-services/odh-cli/blob/rhoai-3.5-ea.1/Dockerfile.konflux) for building `yq` from a submodule.
-
-4. **DNF/microdnf install** — if the tool is available in an approved RPM repository, install it with the system package manager. Add it to `rpms.in.yaml` for hermetic builds.
-
-5. **Hermeto generic fetcher** — as a last resort, use the `generic` type in the hermeto config. This requires a policy exception because it obfuscates dependencies in the SBOM.
+For the full list of replacement strategies (ranked from most to least preferred), see the [Read the Dockerfile.konflux](hermeto-prefetch.md#read-the-dockerfilekonfux) section of the Hermeto Prefetch Guide. The short version: prefer choosing a base image that already has the tool, or use multi-stage `COPY --from=` from a trusted Red Hat image, or build from source via a git submodule. The generic fetcher is a last resort and requires a policy exception.
 
 ## Removing Unnecessary Package Installs
 
 Before adding RPM prefetch entries (`rpms.in.yaml`) for a system package, check whether the package is actually needed in the Konflux build. Some packages in the upstream or midstream Dockerfile are only needed for development, testing, or features that aren't active in the productized build.
 
-For example, [trainer's Dockerfile.odh](https://github.com/red-hat-data-services/trainer/blob/rhoai-3.5-ea.1/cmd/trainer-controller-manager/Dockerfile.odh) installs `bind-utils`, but the Dockerfile.konflux drops it entirely rather than adding it to RPM prefetch. Each additional RPM adds build time, image size, and potential security surface.
+For example, [trainer's Dockerfile.odh](https://github.com/red-hat-data-services/trainer/blob/138f5c9d590be0e7aa548798b20ae1b2fa5ac6b9/cmd/trainer-controller-manager/Dockerfile.odh) installs `bind-utils`, but the Dockerfile.konflux drops it entirely rather than adding it to RPM prefetch. Each additional RPM adds build time, image size, and potential security surface.
 
-Review each package and ask: does the final image or build process actually use this? If not, leave it out.
-<!-- TODO note that this helps with FIPS compliance too. -->
+Review each package and ask: does the final image or build process actually use this? If not, leave it out. Removing unnecessary packages also helps with FIPS compliance — fewer packages means fewer binaries that need to pass `check-payload` validation, and fewer chances of shipping a non-FIPS-compliant crypto library.
 
 ## Dockerfile Placement and Naming
 
 ### Multi-component Repos
 
-When a repo produces multiple container images, use a component-suffix naming convention:
+When a repo produces multiple container images and all Dockerfiles live at the repo root, use a component-suffix naming convention to distinguish them:
 
 ```
 Dockerfile.konflux.autogluon
@@ -192,12 +191,13 @@ Dockerfile.konflux.huggingface
 Dockerfile.konflux.lightgbm
 ```
 
-Each file maps to a separate component in Konflux, with its own PipelineRun in `.tekton/`. See [kserve-autogluon-server](https://github.com/red-hat-data-services/kserve-autogluon-server/blob/rhoai-3.5-ea.1/Dockerfile.konflux.autogluon) for an example.
+Each file maps to a separate component in Konflux, with its own PipelineRun in `.tekton/`. This naming convention is a practical necessity when all Dockerfiles are at the top level — if your repo structure places each component in its own subdirectory, you can instead use `Dockerfile.konflux` in each subdirectory (see [Subdirectory Build Contexts](#subdirectory-build-contexts) below).
+
+See [kserve-autogluon-server](https://github.com/red-hat-data-services/kserve-autogluon-server/blob/2f5b94d0717294d7e2b7813165bf1fe913168c61/Dockerfile.konflux.autogluon) for the suffix-naming example.
 
 ### Subdirectory Build Contexts
 
-<!-- TODO This is what we do now but I am not sure it is a best practice -->
-When the build context is a subdirectory of the repo, place `Dockerfile.konflux` at the **repo root** and use the `path-context` and `dockerfile` parameters in the PipelineRun to wire it up:
+When the build context is a subdirectory of the repo, one common pattern is to place `Dockerfile.konflux` at the **repo root** and use the `path-context` and `dockerfile` parameters in the PipelineRun to wire it up:
 
 ```yaml
 # In .tekton/my-component-push.yaml
@@ -208,9 +208,9 @@ params:
     value: ../Dockerfile.konflux.autogluon
 ```
 
-The `path-context` sets the Docker build context directory. The `dockerfile` path is relative to that context, so `../Dockerfile.konflux.autogluon` reaches back to the repo root. This keeps all Konflux Dockerfiles in a predictable location regardless of where the build context lives.
+The `path-context` sets the Docker build context directory. The `dockerfile` path is relative to that context, so `../Dockerfile.konflux.autogluon` reaches back to the repo root. This keeps all Konflux Dockerfiles in a predictable location regardless of where the build context lives. The alternative — placing the Dockerfile inside the subdirectory and adjusting `dockerfile` to be a simple filename — also works and may be more natural for repos where each subdirectory is self-contained. Choose whichever convention the repo already follows.
 
-See [kserve-autogluon-server](https://github.com/red-hat-data-services/kserve-autogluon-server/blob/rhoai-3.5-ea.1/Dockerfile.konflux.autogluon) with `path-context: python` and `dockerfile: ../Dockerfile.konflux.autogluon`.
+See [kserve-autogluon-server](https://github.com/red-hat-data-services/kserve-autogluon-server/blob/2f5b94d0717294d7e2b7813165bf1fe913168c61/Dockerfile.konflux.autogluon) with `path-context: python` and `dockerfile: ../Dockerfile.konflux.autogluon`.
 
 ## Container Labels
 
@@ -243,7 +243,7 @@ This prevents pip from creating an isolated build environment and downloading bu
 
 This is commonly used as a defensive practice in hermetic builds, though it's not strictly required when build backends (like `setuptools`, `wheel`) are already present in the prefetched dependencies.
 
-See [kserve-autogluon-server Dockerfile.konflux.autogluon](https://github.com/red-hat-data-services/kserve-autogluon-server/blob/rhoai-3.5-ea.1/Dockerfile.konflux.autogluon) for an example.
+See [kserve-autogluon-server Dockerfile.konflux.autogluon](https://github.com/red-hat-data-services/kserve-autogluon-server/blob/2f5b94d0717294d7e2b7813165bf1fe913168c61/Dockerfile.konflux.autogluon) for an example.
 
 ## Git Submodule Builds
 
@@ -262,7 +262,7 @@ FROM registry.access.redhat.com/ubi9/ubi-minimal:9.4@sha256:def...
 COPY --from=yq-builder /yq /usr/local/bin/yq
 ```
 
-The submodule's dependencies are prefetched along with the main project's dependencies via the hermeto config. See [odh-cli Dockerfile.konflux](https://github.com/red-hat-data-services/odh-cli/blob/rhoai-3.5-ea.1/Dockerfile.konflux) for the full pattern.
+The submodule's dependencies are prefetched along with the main project's dependencies via the hermeto config. See [odh-cli Dockerfile.konflux](https://github.com/red-hat-data-services/odh-cli/blob/f4e654f16c63300a9ba5e197e953aae26b41635c/Dockerfile.konflux) for the full pattern.
 
 ## Checklist
 

@@ -25,6 +25,7 @@
   - Removing unnecessary package installs — before adding RPM prefetch (`rpms.in.yaml`) for a system package, check whether it is actually needed in the Konflux build. Some packages present in the upstream/midstream Dockerfile can simply be removed (see [trainer](https://github.com/red-hat-data-services/trainer/blob/rhoai-3.5-ea.1/cmd/trainer-controller-manager/Dockerfile.odh): `bind-utils` removed in Dockerfile.konflux rather than prefetched)
   - Other Konflux-general practices that aren't hermeto-specific
 - [ ] Renovate guide -- how Renovate auto-updates pinned base image digests in Dockerfiles, and how this interacts with build-arg patterns (currently Renovate scans `FROM` lines for digest pins, so switching to `ARG BASE_IMAGE=...@sha256:...` + `FROM ${BASE_IMAGE}` may require renovate config changes to keep automated updates working)
+- [ ] Expand digest pinning section in `dockerfile-productization.md` to cover strategies for renovating an argfile (build-arg file) instead of the Dockerfile itself — e.g., having Renovate update a `.build-args` file that the pipeline passes via `build-arg-file`, so the Dockerfile stays clean and all version pins live in one place
 
 ## FIPS Compliance
 
