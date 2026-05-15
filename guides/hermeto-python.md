@@ -22,6 +22,8 @@ uv pip compile requirements.in \
 
 If you use a custom package index (like AIPCC), add `--emit-index-annotation` so the compiled file records which index each package came from. You can also use `--index-url` in the requirements file or pass `--index` to uv to specify the index.
 
+For multi-arch builds, add `--no-strip-markers` to preserve environment markers (e.g., `platform_machine != "s390x"`) so pip skips arch-specific packages on architectures that don't need them. Without it, `uv pip compile` strips markers and produces a flat list that pip tries to install everywhere. See [Verifying multi-arch compatibility](#verifying-multi-arch-compatibility) for more details.
+
 ### Alternative: `uv export` from `uv.lock`
 
 If your project uses `uv` as its package manager, you can generate `requirements.txt` from a `uv.lock` file instead of using `uv pip compile`:

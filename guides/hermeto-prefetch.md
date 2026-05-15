@@ -25,7 +25,7 @@ If your project uses a single package manager with standard lockfiles, the path 
 2. Write a `hermeto-test.json` config — jump to your package manager: [pip](#pip-python) | [gomod](#gomod-go) | [npm](#npm-javascript) | [cargo](#cargo-rust)
 3. Run `hermeto fetch-deps`, fix issues, repeat until it passes — see [Building with Prefetched Dependencies](#building-with-prefetched-dependencies)
 4. Test with `podman build --network none` — see [Test locally with a hermetic build](#4-test-locally-with-a-hermetic-build)
-5. Copy the JSON config into your `.tekton/` PipelineRun `prefetch-input` parameter — see [What to Commit](#what-to-commit)
+5. Copy the contents of `hermeto-test.json` into your `.tekton/` PipelineRun `prefetch-input` parameter — see [What to Commit](#what-to-commit)
 
 For **Go** and **npm** projects, the config is often a one-liner (`{"type": "gomod", "path": "."}`) and you can skip most of the guide. The bulk of this guide covers **Python/AIPCC** and **RPM** workflows, which have significantly more complexity.
 

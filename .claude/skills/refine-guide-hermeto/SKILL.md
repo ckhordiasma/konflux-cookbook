@@ -57,12 +57,12 @@ Read `guides/hermeto-prefetch.md` and `guides/hermeto-python.md` (relative to th
 
 5. **Walk through the guide**: Using the guide content (from `guides/hermeto-prefetch.md` — provided in the agent prompt during parallel runs, or read directly for single-repo runs), simulate following it step-by-step for this repo. For each section of the guide, check whether it would lead a reader to the same implementation:
 
-   - **"Create a Dockerfile.konflux"**: Does the guide's advice to copy and modify the Dockerfile match what the developer actually did? Were there structural changes the guide doesn't mention (e.g., workspace restructuring, base image swaps)?
-   - **"Start from the Dockerfile"**: Does the guide's instruction to "identify every network access point" produce the same list of package managers as the `prefetch-input`? Would a reader of the guide know how to handle this repo's specific setup (monorepo, multi-stage builds, multiple components)?
+   - **Dockerfile creation**: Does the guide's advice to copy and modify the Dockerfile match what the developer actually did? Were there structural changes the guide doesn't mention (e.g., workspace restructuring, base image swaps)?
+   - **Network access analysis**: Does the guide's instruction to "identify every network access point" produce the same list of package managers as the `prefetch-input`? Would a reader of the guide know how to handle this repo's specific setup (monorepo, multi-stage builds, multiple components)?
    - **Package manager config**: For each manager in the `prefetch-input`, check the guide's section for that manager. Would following it produce the same config? Flag fields, patterns, or multi-path configs not covered.
    - **Lockfile generation**: Are the committed lockfiles consistent with what the guide's instructions would produce?
-   - **"Building with Prefetched Dependencies"**: Does the guide's local testing workflow (fetch-deps, generate-env, inject-files, podman build) apply to this repo without modification?
-   - **"Common Gotchas"**: Are there workarounds in the implementation that aren't documented? Are there gotchas in the guide that don't apply?
+   - **Local testing workflow**: Does the guide's local testing workflow (fetch-deps, generate-env, inject-files, podman build) apply to this repo without modification?
+   - **Gotchas and workarounds**: Are there workarounds in the implementation that aren't documented? Are there gotchas in the guide that don't apply?
 
    **Verify claims against upstream docs.** Before asserting how a package manager or hermeto feature works, check the [hermeto docs](https://hermetoproject.github.io/hermeto/latest/) to confirm. Do not assume behavior from a single repo's pipeline config — the config may be incorrect, outdated, or cargo-culted. The guide should reflect how hermeto actually works, not just how one team configured it.
 
