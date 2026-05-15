@@ -1269,6 +1269,10 @@ The sed command in [step 2](#2-generate-the-environment-file-and-modify-the-dock
 
 **Fix:** Install GNU sed with `brew install gnu-sed` and use `gsed` instead of `sed` in the command.
 
+### Eliminating build stages instead of hermeticizing them
+
+Before adding prefetch entries for every network access point in your Dockerfile, consider whether each build stage is essential to the final image. Stages that produce optional artifacts — test fixtures, sample compilations, CLI tools only used in CI — can sometimes be removed from Dockerfile.konflux entirely rather than made hermetic. This is simpler than adding pip, generic, or npm prefetch entries for stages whose output is not shipped in the production image. For example, the [data-science-pipelines](https://github.com/red-hat-data-services/data-science-pipelines/tree/rhoai-3.5-ea.1) api-server removed an entire Python compiler stage (pip installs, Argo CLI download, sample compilation) from Dockerfile.konflux because those artifacts are produced by a separate CI pipeline.
+
 ### Organizing workarounds
 
 If you have multiple hermetic build fixes, collect them in a shell script (e.g., `hermetic_fixes.sh`) rather than bloating the Dockerfile. This makes it clear which steps are temporary workarounds vs. permanent build logic:
