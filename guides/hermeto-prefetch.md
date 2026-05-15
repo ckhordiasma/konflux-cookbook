@@ -34,9 +34,9 @@ For **Go** and **npm** projects, the config is often a one-liner (`{"type": "gom
 This guide is long. Here's what you can skip based on your project:
 
 - **Go or npm only** — read your [package manager section](#configuring-hermeto-testjson), then [Building with Prefetched Dependencies](#building-with-prefetched-dependencies) and [What to Commit](#what-to-commit). Skip everything else.
+- **Python with AIPCC** (recommended) — read the [pip section](#pip-python), then the full [Python guide](hermeto-python.md).
 - **Python without AIPCC** — read the [pip section](#pip-python), [Building with Prefetched Dependencies](#building-with-prefetched-dependencies), and the [Python guide](hermeto-python.md#python-requirements) for requirements generation. Skip the AIPCC and source build sections.
-- **Python with AIPCC** — read the [pip section](#pip-python), then the full [Python guide](hermeto-python.md). This is the most complex path.
-- **RPMs needed** — add the [RPM Dependencies](#rpm-dependencies) section to whatever else you're reading.
+- **RPMs needed** — add the [RPM Dependencies](#rpm-dependencies) section to whatever else you're reading. Set up RPM prefetch before attempting a hermetic build, since `microdnf`/`dnf` will fail without network access.
 - **Multi-arch builds** — add [Testing on Remote Architectures](#testing-on-remote-architectures) and the [Beaker VM guide](beaker-vm.md).
 
 > **Do not commit `. /cachi2/cachi2.env` sourcing into your Dockerfile.konflux.** The Konflux build pipeline [automatically injects](https://github.com/konflux-ci/build-definitions/blob/44ffba6bd5e8a3da0511b13677b3a0982ae6722e/task/buildah-oci-ta/0.8/buildah-oci-ta.yaml#L749-L754) `. /cachi2/cachi2.env &&` before every `RUN` instruction at build time using a sed transform. The local testing steps in this guide replicate that injection for `podman build` — do not check those changes into your committed Dockerfile.konflux.
