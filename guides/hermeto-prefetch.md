@@ -787,6 +787,8 @@ Consider adding these to `.gitignore` and `.dockerignore` to avoid accidentally 
 **Update in Tekton:**
 - Copy the contents of `hermeto-test.json` into the prefetch task parameter in your `.tekton/` PipelineRun
 
+**Next step:** For RHOAI components, see [Deploying Hermetic Build Config to Konflux](deploying-to-konflux.md) for how to get your working config into the midstream and downstream pipelines.
+
 ## Common Gotchas
 
 For Python and AIPCC-specific gotchas (uv/pip compatibility, build backend issues, hash problems, pre-release version conflicts), see the [Python guide's Common Gotchas](hermeto-python.md#common-gotchas).
