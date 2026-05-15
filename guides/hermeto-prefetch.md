@@ -35,7 +35,7 @@ This guide is long. Here's what you can skip based on your project:
 
 - **Go or npm only** — read your [package manager section](#configuring-hermeto-testjson), then [Building with Prefetched Dependencies](#building-with-prefetched-dependencies) and [What to Commit](#what-to-commit). Skip everything else.
 - **Python with AIPCC** (recommended) — read the [pip section](#pip-python), then the full [Python guide](hermeto-python.md).
-- **Python without AIPCC** — read the [pip section](#pip-python), [Building with Prefetched Dependencies](#building-with-prefetched-dependencies), and the [Python guide](hermeto-python.md#python-requirements) for requirements generation. Skip the AIPCC and source build sections.
+- **Python without AIPCC** — read the [pip section](#pip-python), [Building with Prefetched Dependencies](#building-with-prefetched-dependencies), and the Python guide for [requirements generation](hermeto-python.md#python-requirements) and [building from source](hermeto-python.md#building-from-source-for-missing-architectures). Using pre-built wheels from PyPI requires a product exception — source builds are the default. Skip the AIPCC sections.
 - **RPMs needed** — add the [RPM Dependencies](#rpm-dependencies) section to whatever else you're reading. Set up RPM prefetch before attempting a hermetic build, since `microdnf`/`dnf` will fail without network access.
 - **Multi-arch builds** — add [Testing on Remote Architectures](#testing-on-remote-architectures) and the [Beaker VM guide](beaker-vm.md).
 
@@ -82,7 +82,7 @@ Getting a hermetic build working is an iterative process. The core loop for each
 3. Fix issues (missing lockfiles, wrong options, version mismatches) and re-run until fetch-deps succeeds
 4. Run a build to verify the prefetched deps actually work
 
-You can work through package managers one at a time rather than configuring everything upfront. This works because some managers (like pip) use the prefetched cache automatically once the hermeto env vars are injected into the Dockerfile -- so you can run `podman build --network none` to verify that *the current manager* is fully hermetic while other managers (like RPMs) still use the network. Once one manager is confirmed hermetic, move on to the next.
+You can work through package managers one at a time — add one to `hermeto-test.json`, run `fetch-deps` until it passes, then add the next. While iterating, build without `--network none` to verify the prefetched deps are consumed correctly without blocking other managers that aren't configured yet. Once all managers pass `fetch-deps`, add `--network none` to confirm the build is fully hermetic end-to-end.
 
 Alternatively, you can configure all managers in `hermeto-test.json` first, get `fetch-deps` passing for everything, and then do a single full hermetic build at the end. Choose whichever approach suits the complexity of your project.
 
