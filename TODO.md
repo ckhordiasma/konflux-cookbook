@@ -6,27 +6,8 @@
 
 ## Hermetic Builds with Hermeto
 
-### Investigation
-
-- [ ] [model-metadata-collection](https://github.com/red-hat-data-services/model-metadata-collection) — Dockerfile.konflux has zero network access (pure data container: only COPYs YAML files), yet pipeline has `prefetch-input: {"type": "gomod", "path": "."}` and `hermetic: true`. Investigate whether this is for SBOM/provenance tracking, or if there's another reason. If SBOM-only, consider documenting the "data-only container" pattern in the guide.
-
-### Repo Cleanup
-
-- [ ] [llama-stack-provider-trustyai-garak](https://github.com/red-hat-data-services/llama-stack-provider-trustyai-garak) — remove vestigial dummy Cargo project (`Cargo.toml`, `Cargo.lock`, `.konflux/main.rs`) and per-arch pip workaround files (`.konflux/s390x`, `.konflux/ppc64le`, `.konflux/prep-hermeto.sh`). These were workarounds for hermeto bugs ([#1205](https://github.com/hermetoproject/hermeto/issues/1205)) that are no longer used now that AIPCC provides prebuilt wheels.
-- [ ] [distributed-workloads](https://github.com/red-hat-data-services/distributed-workloads) — `[tool.uv]` config (index-url, index-strategy, environments) is in `pyproject.toml`, which may cause merge conflicts when syncing from upstream. Consider moving these settings to CLI flags in a compile script or Makefile instead.
-
-### AIPCC Guide Improvements
-
 - [ ] Document `-test` index variants (e.g., `cpu-ubi9-test/simple/`) that carry midstream/pre-release builds like `vllm==0.18.0+rhaiv.4` — found in llm-d-kv-cache and llama-stack-provider repos
 - [ ] Clarify the two URL prefixes (`console.redhat.com` vs `packages.redhat.com`) — both work, repos use them interchangeably
-
-### Repos not yet analyzed
-
-- [ ] [kserve](https://github.com/red-hat-data-services/kserve) — 6/7 hermetic (storage-initializer is not)
-- [ ] [RHOAI-Build-Config](https://github.com/red-hat-data-services/RHOAI-Build-Config) — 2/4 hermetic (operator-bundle, fbc-fragment; chart builds are not)
-- [ ] [feast](https://github.com/red-hat-data-services/feast) — 1/2 hermetic (feast-operator; feature-server is not)
-- [ ] [model-registry](https://github.com/red-hat-data-services/model-registry) — 1/2 hermetic (model-registry; job-async-upload is not)
-- [ ] [trustyai-service-operator](https://github.com/red-hat-data-services/trustyai-service-operator) — 1/2 hermetic (operator; ta-lmes-driver is not)
 
 ## Dockerfile.konflux Best Practices
 

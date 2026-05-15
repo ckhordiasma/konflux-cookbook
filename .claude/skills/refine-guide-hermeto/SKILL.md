@@ -8,9 +8,26 @@ version: 1.0.0
 
 Read `guides/hermeto-prefetch.md` and `guides/hermeto-python.md` (relative to the plugin root) thoroughly before starting. Together they are the source of truth for all hermeto details — the main guide covers general workflow and non-Python package managers, the Python guide covers requirements generation, AIPCC, and source builds. The goal of this skill is to compare a real-world hermetic build implementation against the guides and propose improvements where they fall short.
 
+## Repos to analyze (branch: rhoai-3.5-ea.1)
+
+- [ ] [kserve](https://github.com/red-hat-data-services/kserve) — 6/7 hermetic (storage-initializer is not)
+- [ ] [RHOAI-Build-Config](https://github.com/red-hat-data-services/RHOAI-Build-Config) — 2/4 hermetic (operator-bundle, fbc-fragment; chart builds are not)
+- [ ] [feast](https://github.com/red-hat-data-services/feast) — 1/2 hermetic (feast-operator; feature-server is not)
+- [ ] [model-registry](https://github.com/red-hat-data-services/model-registry) — 1/2 hermetic (model-registry; job-async-upload is not)
+- [ ] [trustyai-service-operator](https://github.com/red-hat-data-services/trustyai-service-operator) — 1/2 hermetic (operator; ta-lmes-driver is not)
+
+### Investigation
+
+- [ ] [model-metadata-collection](https://github.com/red-hat-data-services/model-metadata-collection) — Dockerfile.konflux has zero network access (pure data container: only COPYs YAML files), yet pipeline has `prefetch-input: {"type": "gomod", "path": "."}` and `hermetic: true`. Investigate whether this is for SBOM/provenance tracking, or if there's another reason. If SBOM-only, consider documenting the "data-only container" pattern in the guide.
+
+### Repo cleanup (not guide work — track separately)
+
+- [ ] [llama-stack-provider-trustyai-garak](https://github.com/red-hat-data-services/llama-stack-provider-trustyai-garak) — remove vestigial dummy Cargo project and per-arch pip workaround files (workarounds for hermeto [#1205](https://github.com/hermetoproject/hermeto/issues/1205), no longer needed with AIPCC)
+- [ ] [distributed-workloads](https://github.com/red-hat-data-services/distributed-workloads) — `[tool.uv]` config in `pyproject.toml` may cause upstream merge conflicts; consider moving to CLI flags
+
 ## Steps
 
-1. **Get repo and branch**: If no repo is specified in the arguments, read `TODO.md` (relative to the cookbook root) and find the next unchecked repo under the "Refine Hermeto Guide Against Real Repos" section. The TODO section header specifies the branch to use. Present the repo and branch to the user for confirmation before proceeding. If the user provides a repo in the arguments, use that instead. Clone the repo at the specified branch into `.claude/repos/<repo-name>-<branch>` (relative to the cookbook root) so it doesn't pollute the project. If the directory already exists from a previous run, ask whether to re-clone or reuse it.
+1. **Get repo and branch**: If no repo is specified in the arguments, find the next unchecked repo in the "Repos to analyze" section above. Present the repo and branch to the user for confirmation before proceeding. If the user provides a repo in the arguments, use that instead. Clone the repo at the specified branch into `.claude/repos/<repo-name>-<branch>` (relative to the cookbook root) so it doesn't pollute the project. If the directory already exists from a previous run, ask whether to re-clone or reuse it.
 
    **Parallel analysis:** When the user asks to analyze multiple repos (e.g., "check all AIPCC repos"), spawn background agents to analyze each repo concurrently. Each agent should perform steps 2–5 independently and return its findings. Keep the main context free for synthesis — do not duplicate the agents' analysis work in the main thread.
 
