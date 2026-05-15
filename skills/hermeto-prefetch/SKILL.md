@@ -12,7 +12,7 @@ Read `guides/hermeto-prefetch.md` (relative to the plugin root) thoroughly befor
 
 1. **Identify the Dockerfile**: Find Dockerfiles in the project. If there are multiple, ask the user which one is the target. Ask whether the Dockerfile requires additional build inputs (argfiles, build-args, `.env` files) that affect what gets installed.
 
-2. **Check for AIPCC usage**: If the project has Python dependencies, ask whether the project uses or should use AIPCC wheels. If yes, follow the "Using AIPCC Wheels" section in the guide — check the `red-hat-data-services/notebooks` repo as a reference for working AIPCC base image and index URL combinations. If adopting AIPCC, consider starting from a simpler Dockerfile that uses the AIPCC base image rather than adapting an existing Dockerfile with `microdnf install` and source builds.
+2. **Check for AIPCC usage**: If the project has Python dependencies, ask whether the project uses or should use AIPCC wheels. If yes, follow the "Using AIPCC Wheels" section in `guides/hermeto-python.md` — check the `red-hat-data-services/notebooks` repo as a reference for working AIPCC base image and index URL combinations. If adopting AIPCC, consider starting from a simpler Dockerfile that uses the AIPCC base image rather than adapting an existing Dockerfile with `microdnf install` and source builds.
 
 3. **Analyze the Dockerfile**: Follow the "Start from the Dockerfile" section in the guide. Present a summary to the user mapping each network access point to the hermeto config section that would replace it, and flag anything that doesn't map to a supported package manager.
 

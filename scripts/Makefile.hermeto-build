@@ -45,7 +45,7 @@ ifeq ($(ARCH),arm64)
 endif
 
 # Run hermeto via its container image
-HERMETO := podman run --rm -v "$(CURDIR):$(CURDIR):z" -w "$(CURDIR)" \
+HERMETO := podman run --rm -v "$(realpath .):$(realpath .):z" -w "$(realpath .)" \
   ghcr.io/hermetoproject/hermeto:latest
 
 # Use gsed on macOS, sed on Linux
@@ -57,6 +57,9 @@ endif
 
 # Sentinel file that hermeto creates on successful fetch
 HERMETO_SENTINEL := $(HERMETO_OUTPUT)/.build-config.json
+
+# Environment file generated from prefetched output
+HERMETO_ENV := .hermeto.env
 
 .PHONY: all check-podman check-sed prefetch dockerfile build clean
 
@@ -78,10 +81,12 @@ check-sed:
 $(HERMETO_SENTINEL): $(HERMETO_CONFIG)
 	rm -rf $(HERMETO_OUTPUT) && mkdir $(HERMETO_OUTPUT)
 	$(HERMETO) fetch-deps --source . --output $(HERMETO_OUTPUT) $(HERMETO_CONFIG)
-	$(HERMETO) generate-env $(HERMETO_OUTPUT)/ -o .hermeto.env --for-output-dir /cachi2/output
 	$(HERMETO) inject-files ./$(HERMETO_OUTPUT) --for-output-dir /cachi2/output
 
-prefetch: check-podman $(HERMETO_SENTINEL)
+$(HERMETO_ENV): $(HERMETO_SENTINEL)
+	$(HERMETO) generate-env $(HERMETO_OUTPUT)/ -o $(HERMETO_ENV) --for-output-dir /cachi2/output
+
+prefetch: check-podman $(HERMETO_SENTINEL) $(HERMETO_ENV)
 
 # ---------------------------------------------------------------------------
 # dockerfile: generate the hermetic Dockerfile by prepending
@@ -101,12 +106,12 @@ dockerfile: check-sed $(HERMETO_DOCKERFILE)
 # ---------------------------------------------------------------------------
 RPM_REPOS_DIR := $(HERMETO_OUTPUT)/deps/rpm/$(ARCH)/repos.d
 
-build: $(HERMETO_SENTINEL) $(HERMETO_DOCKERFILE)
+build: $(HERMETO_SENTINEL) $(HERMETO_ENV) $(HERMETO_DOCKERFILE)
 	podman build \
 	  --no-cache \
 	  --network none \
 	  --volume "$(realpath ./$(HERMETO_OUTPUT))":/cachi2/output:Z \
-	  --volume "$(realpath ./.hermeto.env)":/cachi2/cachi2.env:Z \
+	  --volume "$(realpath ./$(HERMETO_ENV))":/cachi2/cachi2.env:Z \
 	  $(if $(wildcard $(RPM_REPOS_DIR)),--volume "$(realpath ./$(RPM_REPOS_DIR))":/etc/yum.repos.d:Z) \
 	  -f $(HERMETO_DOCKERFILE) $(BUILD_CONTEXT)
 
@@ -114,4 +119,4 @@ build: $(HERMETO_SENTINEL) $(HERMETO_DOCKERFILE)
 # clean: remove all generated artifacts
 # ---------------------------------------------------------------------------
 clean:
-	rm -rf $(HERMETO_OUTPUT) .hermeto.env
+	rm -rf $(HERMETO_OUTPUT) $(HERMETO_ENV)

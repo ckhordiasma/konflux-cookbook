@@ -6,15 +6,15 @@
 
 ## Multi-Arch
 
-- [ ] Provisioning Power/Z architecture hardware on Beaker
+- [x] Provisioning Power/Z architecture hardware on Beaker
 
 ## Hermetic Builds with Hermeto
 
-- [ ] Using Hermeto locally to prefetch dependencies, and modifying your build to consume prefetched dependencies
-- [ ] Running Hermeto as a container (for environments where you can't install it directly)
-- [ ] Python-specific Hermeto gotchas
-- [ ] RPM-specific Hermeto gotchas
-- [ ] Leveraging AIPCC Python wheel releases
+- [x] Using Hermeto locally to prefetch dependencies, and modifying your build to consume prefetched dependencies
+- [x] Running Hermeto as a container (for environments where you can't install it directly)
+- [x] Python-specific Hermeto gotchas
+- [x] RPM-specific Hermeto gotchas
+- [x] Leveraging AIPCC Python wheel releases
 
 ### Investigation
 

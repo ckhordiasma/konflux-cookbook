@@ -86,7 +86,11 @@ bkr whoami
 
 ### Add your SSH key
 
-Beaker installs SSH keys from your user preferences into every system you provision. Upload your public key so you can SSH in without the default root password:
+Beaker installs SSH keys from your user preferences into every system you provision. Upload your public key so you can SSH in without the default root password.
+
+The easiest way is through the [Beaker preferences](https://beaker.engineering.redhat.com/prefs/) web UI — paste your public key and save.
+
+Alternatively, upload via the API (requires Kerberos negotiate auth and a two-step cookie exchange):
 
 ```bash
 # Your Kerberos username (confirm with the .username field from `bkr whoami`)
@@ -102,8 +106,6 @@ curl -b /tmp/beaker-cookies -X POST \
   --data-binary @$SSH_KEY \
   https://beaker.engineering.redhat.com/users/$BEAKER_USER/ssh-public-keys/
 ```
-
-You can also do this through the [Beaker preferences](https://beaker.engineering.redhat.com/prefs/) web UI.
 
 ### Provision a machine
 

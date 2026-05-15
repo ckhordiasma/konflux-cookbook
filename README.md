@@ -22,9 +22,9 @@ konflux-cookbook/
 └── .claude-plugin/   # Plugin manifest
 ```
 
-- **`guides/`** -- Step-by-step guides you can follow manually. 
+- **`guides/`** -- Step-by-step guides you can follow manually.
 - **`skills/`** -- Claude Code plugin skills that reference the guides. Use the skills to have claude walk you through a guide.
-- `scripts/` -- Scripts that "one-shot" the guide, given you provide it with all the correct input parameters. In other words, a deterministic automation of a given guide.
+- `scripts/` -- Runnable implementations of what the guides describe (scripts, Makefiles). Some automate a guide end-to-end given the right inputs; others provide incremental targets for iterative workflows.
 
 ## Guides
 
@@ -33,6 +33,7 @@ konflux-cookbook/
 | [create-pr-pipeline](guides/create-pr-pipeline.md) | Create a temporary pull request PipelineRun from a push PipelineRun to test build changes on an RHOAI release branch |
 | [test-conforma](guides/test-conforma.md) | Run Conforma (Enterprise Contract) validation against a single image or Konflux snapshot to check release policy compliance |
 | [hermeto-prefetch](guides/hermeto-prefetch.md) | Set up hermetic builds with Hermeto (pre-fetch dependencies for offline container builds) |
+| [hermeto-python](guides/hermeto-python.md) | Python requirements, AIPCC wheels, and source builds for hermetic Konflux builds |
 | [beaker-vm](guides/beaker-vm.md) | Provision a VM on Beaker for multi-arch build testing |
 
 ## Using as a Claude Code plugin

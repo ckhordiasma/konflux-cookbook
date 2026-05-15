@@ -6,7 +6,7 @@ version: 1.0.0
 
 # Refine the Hermeto Guide Using a Real-World Repo
 
-Read `guides/hermeto-prefetch.md` (relative to the plugin root) thoroughly before starting. It is the source of truth for all hermeto details. The goal of this skill is to compare a real-world hermetic build implementation against the guide and propose improvements where the guide falls short.
+Read `guides/hermeto-prefetch.md` and `guides/hermeto-python.md` (relative to the plugin root) thoroughly before starting. Together they are the source of truth for all hermeto details — the main guide covers general workflow and non-Python package managers, the Python guide covers requirements generation, AIPCC, and source builds. The goal of this skill is to compare a real-world hermetic build implementation against the guides and propose improvements where they fall short.
 
 ## Steps
 
