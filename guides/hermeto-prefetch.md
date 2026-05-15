@@ -177,7 +177,7 @@ Some packages lack wheels or sdists on PyPI for certain architectures -- it is c
 | `binary` | *(omitted = sdists only)* | Binary wheel filter (see below) |
 
 **Example — minimal:**
-
+[TODO verify all my explanations from hermeto docs]
 This configuration will fetch sdists for all the packages listed in requirements.txt
 ```json
 {"type": "pip", "path": ".", "requirements_files": ["requirements.txt"]}
@@ -185,7 +185,7 @@ This configuration will fetch sdists for all the packages listed in requirements
 
 **Example — with binary wheels and build deps:**
 
-This configuration will fetch binary wheels for all packages listed in either requirements.txt or requirements-build.txt, matching the listed architectures. If a package does not supply a wheel for a given architecture, a sdist will be pulled instead.
+This configuration will fetch binary wheels for all packages listed in either requirements.txt or requirements-build.txt, matching the listed architectures. If a package does not publish a wheel for a given architecture, a sdist will be pulled instead.
 ```json
 {
   "type": "pip",
@@ -204,11 +204,12 @@ By default, hermeto fetches only source distributions (sdists). Add a `binary` o
 
 The key fields are `packages` (comma-separated names, or `:all:` to try wheels for everything), `arch` (comma-separated architectures, default `"x86_64"`), and `os` (default `"linux"`). When `packages` is `:all:` (the default), hermeto prefers wheels but falls back to sdists. When you name specific packages, hermeto *fails* if no matching wheel exists. See the [hermeto pip docs](https://hermetoproject.github.io/hermeto/latest/pip/) for additional filter fields (`py_version`, `py_impl`, `abi`, `platform`).
 
+[TODO double check this, it might actually search for all arches]
 An empty `"binary": {}` is valid and uses all defaults (`packages: ":all:"`, `arch: "x86_64"`). This is the simplest way to enable wheel fetching, but it only fetches x86_64 wheels. To fetch wheels for all your target architectures, list them explicitly in `arch`.
 
-`requirements_build_files` is needed if any of your dependencies are installed from source distributions (sdists) -- the build file provides the build backends (hatchling, maturin, etc.) needed to compile them.
+When building from source distributions, `requirements_build_files` should be populated with one or more `requirements-build.txt` files that include whatever build dependencies/backends are needed to compile every package (hatchling, maturing, etc). The format is the same as a normal `requirements.txt`, with the exception that it can specify multiple versions of the same package. Treat it as basically a big list of packages that hermeto will fetch for you. [TODO review how I reworded this]
 
-If a package has no wheel for your target architecture on PyPI (common on ppc64le/s390x), you have two options:
+If a package has no wheel for your target architecture on PyPI (a regular occurrence when building for ppc64le/s390x), you have two options:
 
 1. **Use a custom index** like AIPCC that publishes prebuilt wheels for all architectures (see [Using AIPCC wheels](hermeto-python.md#using-aipcc-wheels)). This is the preferred approach -- hermeto handles arch selection at download time, so one requirements file works for all architectures.
 2. **Build from source** by prefetching the source tarball through `requirements_build_files` alongside the build backends needed to compile it. Pip will use PyPI wheels where available and fall back to the source tarball on architectures that lack wheels. See [Building from source for missing architectures](hermeto-python.md#building-from-source-for-missing-architectures) for a worked example.
@@ -217,7 +218,7 @@ If a package has no wheel for your target architecture on PyPI (common on ppc64l
 
 [Hermeto cargo docs](https://hermetoproject.github.io/hermeto/latest/cargo/)
 
-Requires `Cargo.toml` and `Cargo.lock` to be present and in sync. The Cargo binary must be installed locally (or in the hermeto container).
+Requires `Cargo.toml` and `Cargo.lock` to be present and in sync. The Cargo binary must be installed locally (or in the hermeto container). [TODO search slack for the rust builder image, either a ubi9 one or the one from konflux, and reference it here]
 
 **Config fields:**
 
@@ -250,14 +251,15 @@ Requires `go.mod` and `go.sum`.
 ```json
 {"type": "gomod", "path": "."}
 ```
-
+[ TODO reference the go builder image, search slack if needed]
 Go projects are often the simplest case for hermetic builds — the `gomod` prefetch combined with the pipeline's automatic `cachi2.env` injection is usually sufficient with no Dockerfile.konflux modifications. If your Go project has no other network access points (no `npm`, `pip`, `microdnf install`, `curl`, etc.), you may only need the Konflux-general changes (base image pinning, labels) and a single `{"type": "gomod"}` prefetch entry.
 
-**Vendor builds:** If your Dockerfile runs `go mod vendor` and builds with `-mod=vendor`, this works seamlessly with the prefetched cache — no extra configuration needed. The pipeline's `cachi2.env` sets `GOMODCACHE` to point at the prefetched dependencies, so `go mod vendor` copies from the prefetched cache into the local `vendor/` directory, and `go build -mod=vendor` uses it from there.
+**Vendor builds:** No extra configuration should be needed if your Dockerfile runs `go mod vendor` and builds with `-mod=vendor`, this works seamlessly with the prefetched cache. The pipeline's `cachi2.env` sets `GOMODCACHE` to point at the prefetched dependencies, so `go mod vendor` copies from the prefetched cache into the local `vendor/` directory, and `go build -mod=vendor` uses it from there.
 
-**`-mod=mod` builds:** If your Dockerfile sets `GOFLAGS=-mod=mod` or passes `-mod=mod` to `go build`, this also works with the prefetched cache. Go reads from the local `GOMODCACHE` without network access — the flag controls how Go resolves modules, not where it fetches them from.
+**`-mod=mod` builds:** No extra configuration needed in this case either. If your Dockerfile sets `GOFLAGS=-mod=mod` or passes `-mod=mod` to `go build`, this will work with the prefetched cache. Go reads from the local `GOMODCACHE` without network access — the flag controls how Go resolves modules, not where it fetches them from.
 
-**Removing `go mod download`:** If the upstream Dockerfile has an explicit `go mod download` step, remove it from Dockerfile.konflux. In a hermetic build, the pipeline's `cachi2.env` sets `GOMODCACHE` to the prefetched cache, so `go build` finds all dependencies without a separate download step. Leaving `go mod download` in place is harmless (it resolves from the local cache, not the network) but is dead code. If you see the older Cachito conditional pattern (`if [ -z ${CACHITO_ENV_FILE} ]; then go mod download; ...`), replace the entire block with just the `go build` command.
+[TODO review contradictory instructions here. review hermeto docs to see which side is correct]
+**Removing `go mod download`:** If the upstream Dockerfile has an explicit `go mod download` step, you will need to remove it from Dockerfile.konflux. In a hermetic build, the pipeline's `cachi2.env` sets `GOMODCACHE` to the prefetched cache, so `go build` finds all dependencies without a separate download step. Leaving `go mod download` in place is harmless (it resolves from the local cache, not the network) but is dead code. If you see the older Cachito conditional pattern (`if [ -z ${CACHITO_ENV_FILE} ]; then go mod download; ...`), replace the entire block with just the `go build` command.
 
 **Multi-module repos with Go workspaces:** If your repo contains multiple Go modules (separate `go.mod` files), check whether they're joined by a [`go.work`](https://go.dev/doc/tutorial/workspaces) file. When a `go.work` exists at the workspace root, Go tooling unifies the dependency graph across all workspace modules. A single `{"type": "gomod", "path": "."}` entry pointing at the workspace root is sufficient — hermeto's Go tooling respects the workspace and prefetches dependencies for all included modules.
 
