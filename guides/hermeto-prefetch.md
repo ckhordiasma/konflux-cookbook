@@ -1,4 +1,4 @@
-# Using Hermeto to Prefetch Dependencies for Hermetic Konflux Builds
+# Using Hermeto to Prefetch Dependencies for Local Hermetic Builds
 
 ## What is Hermeto
 
@@ -15,32 +15,35 @@ alias hermeto='podman run --rm -ti -v "$PWD:$PWD:z" -w "$PWD" \
   ghcr.io/hermetoproject/hermeto:latest'
 ```
 
-The `-v "$PWD:$PWD:z"` flag bind-mounts your project directory into the container so hermeto can read your lockfiles and write output, and `-w "$PWD"` sets the working directory to match. All `hermeto` commands in this guide assume this alias is in place.
+The `-v "$PWD:$PWD:z"` flag bind-mounts your project directory into the container (using `z` to be selinux friendly) so hermeto can read your lockfiles and write output. `-w "$PWD"` sets the working directory to match. All `hermeto` commands in this guide assume this alias is in place.
 
 ## Quick Start
 
 If your project uses a single package manager with standard lockfiles, the path is short:
 
 0. Build the original Dockerfile locally to establish a baseline — see [Establish a Baseline Build](#establish-a-baseline-build)
-1. Read your Dockerfile and identify every network access point (pip install, go build, npm ci, dnf install, curl/wget)
-2. Write a `hermeto-test.json` config — jump to your package manager: [pip](#pip-python) | [gomod](#gomod-go) | [npm](#npm-javascript) | [cargo](#cargo-rust)
+1. Read your Dockerfile and identify every command that accesses the internet (pip install, go build, npm ci, dnf install, curl/wget)
+2. Write a `hermeto-test.json` config — jump to package manager: [pip](#pip-python) | [gomod](#gomod-go) | [npm](#npm-javascript) | [cargo](#cargo-rust)
 3. Run `hermeto fetch-deps`, fix issues, repeat until it passes — see [Building with Prefetched Dependencies](#building-with-prefetched-dependencies) (or use the [Makefile](#makefile-based-workflow) to automate steps 3–4)
 4. Test with `podman build --network none` — see [Test locally with a hermetic build](#4-test-locally-with-a-hermetic-build)
 5. Copy the contents of `hermeto-test.json` into your `.tekton/` PipelineRun `prefetch-input` parameter — see [What to Commit](#what-to-commit)
 
-For **Go** and **npm** projects, the config is often a one-liner (`{"type": "gomod", "path": "."}`) and you can skip most of the guide. The bulk of this guide covers **Python/AIPCC** and **RPM** workflows, which have significantly more complexity.
+For **Go** and **npm** projects, the config is often a one-liner (`{"type": "gomod", "path": "."}`) and you can skip most of the guide. Projects with **Python/AIPCC**, **RPM**, and/or **Generic** dependencies have much more complexity.
 
 ### What to read
 
 This guide is long. Here's what you can skip based on your project:
 
-- **Go or npm only** — read your [package manager section](#configuring-hermeto-testjson), then [Building with Prefetched Dependencies](#building-with-prefetched-dependencies) and [What to Commit](#what-to-commit). Skip everything else.
-- **Python with AIPCC** (recommended) — read the [pip section](#pip-python), then the full [Python guide](hermeto-python.md).
+- **Go or npm only** — read your [package manager section](#configuring-hermeto-testjson)[TODO change this to links to the GO and NPM package manager sections], then [Building with Prefetched Dependencies](#building-with-prefetched-dependencies) and [What to Commit](#what-to-commit). Skip everything else.
+[TODO change this to Python top bullet - review the #pip-python section 
+  and sub bullets AIPCC (recommended) and Without AIPCC with their descriptions]
+- **Python with AIPCC** (recommended) — read the [pip section](#pip-python) for an initial overview, then go through the full [Python guide](hermeto-python.md).
 - **Python without AIPCC** — read the [pip section](#pip-python), [Building with Prefetched Dependencies](#building-with-prefetched-dependencies), and the Python guide for [requirements generation](hermeto-python.md#python-requirements) and [building from source](hermeto-python.md#building-from-source-for-missing-architectures). Using pre-built wheels from PyPI requires a product exception — source builds are the default. Skip the AIPCC sections.
-- **RPMs needed** — add the [RPM Dependencies](#rpm-dependencies) section to whatever else you're reading. Set up RPM prefetch before attempting a hermetic build, since `microdnf`/`dnf` will fail without network access.
-- **Multi-arch builds** — add [Testing on Remote Architectures](#testing-on-remote-architectures) and the [Beaker VM guide](beaker-vm.md).
+- Need to install things from **RPMs**** — add the [RPM Dependencies](#rpm-dependencies) section to whatever else you're reading. This will involve running the an RPM prefetch command at some point.
+- **Multi-arch builds** — Review the [Beaker VM guide](beaker-vm.md) for how to provision VMs on different architectures.
+Once you have hermetic builds working locally, follow the instructions in [Testing on Remote Architectures](#testing-on-remote-architectures)  
 
-> **Do not commit `. /cachi2/cachi2.env` sourcing into your Dockerfile.konflux.** The Konflux build pipeline [automatically injects](https://github.com/konflux-ci/build-definitions/blob/44ffba6bd5e8a3da0511b13677b3a0982ae6722e/task/buildah-oci-ta/0.8/buildah-oci-ta.yaml#L749-L754) `. /cachi2/cachi2.env &&` before every `RUN` instruction at build time using a sed transform. The local testing steps in this guide replicate that injection for `podman build` — do not check those changes into your committed Dockerfile.konflux.
+> **Do not commit `. /cachi2/cachi2.env` sourcing into your Dockerfile.konflux.** The Konflux build pipeline [automatically injects](https://github.com/konflux-ci/build-definitions/blob/44ffba6bd5e8a3da0511b13677b3a0982ae6722e/task/buildah-oci-ta/0.8/buildah-oci-ta.yaml#L749-L754) `. /cachi2/cachi2.env &&` before every `RUN` instruction at build time using a sed transform. The local testing steps in this guide replicate that injection for `podman build` by creating a temporary dockerfile in the `.hermeto/` folder [TODO link to where this is described in this guide] — do not apply those changes directly to your Dockerfile.konflux.
 
 ## Recommended Workflow
 
@@ -50,7 +53,10 @@ Before attempting hermetic builds, verify that the original Dockerfile builds su
 
 ### Create a Dockerfile.konflux
 
-Start by copying your existing Dockerfile (or `Containerfile`, if your project uses the Podman naming convention) to `Dockerfile.konflux`. This is the copy you will modify for hermetic builds -- keep the original untouched so the project's existing non-hermetic build continues to work.
+[TODO add a note here that a Dockerfile.konflux might already exist if this component was already onboarded with a policy exception to allow non-hermetic builds, or if prior work was done to implement other productization requirements, like using ubi9 base images, adding appropriate container labels, etc]
+
+If a Dockerfile.konflux doesn't already exist, start by copying your existing Dockerfile (or `Containerfile`, if your project uses the Podman naming convention) to `Dockerfile.konflux`. This is the copy you will modify for hermetic builds -- keep the original untouched so the project's existing non-hermetic build continues to work.
+
 
 ```bash
 cp Dockerfile Dockerfile.konflux    # or: cp Containerfile Dockerfile.konflux
@@ -58,21 +64,25 @@ cp Dockerfile Dockerfile.konflux    # or: cp Containerfile Dockerfile.konflux
 
 All subsequent changes in this guide (sourcing the hermeto env file, adding system packages to support hermetic installs, etc.) should be made in `Dockerfile.konflux`.
 
-### Start from the Dockerfile
+### Read the Dockerfile.konflux
 
-The Dockerfile is the source of truth for what the build needs. Before writing any hermeto config, read through the Dockerfile (and any scripts it COPYs and RUNs) and identify every point where the build pulls something from the network:
+The Dockerfile.konflux is the source of truth for what the build needs. Before writing any hermeto config, read through the Dockerfile (and any scripts it COPYs and RUNs) and identify every point where the build pulls something from the network:
 
 - **Package manager installs** -- pip, cargo, npm, go, yarn, bundler
 - **System package installs** -- microdnf, dnf, yum
-- **Direct downloads** -- curl, wget, git clone, or any script that fetches from the internet. These can often be handled with the [generic fetcher](#generic). Alternatively, you can eliminate the download entirely: copy the binary from an existing, trusted container image via a multi-stage `COPY --from=` (e.g., kubectl from `ose-cli-rhel9`), choose a base image that already includes the tools you need, add the tool's source as a git submodule and build it from source with its own prefetch entry, or pre-commit the assets to the repo via a separate CI workflow (e.g., a GitHub Action that clones upstream repos, downloads artifacts, or runs an external build system like PNC, then commits the results so the Dockerfile can simply `COPY` them).
+- **Direct downloads** -- curl, wget, git clone, or any script that fetches from the internet. These can often be handled with the [generic fetcher](#generic). If possible, try to eliminate the generic download entirely via one of these methods (in order of recommendation [TODO i'm trying to say it's sorted from most desirable to least]):
+  - DNF install what you need instead, if available in an approved repo
+  - Choose a base image that already includes the tools you need
+  - Check in the tool's source code as a git submodule and build it hermetically from source in an earlier stage of your build
+  - Copy the binary from an existing, trusted container image via a multi-stage `COPY --from=` (e.g., kubectl from `ose-cli-rhel9`)[TODO add a sha-pinned link showing this example)
+  - DNF install from a non-approved source, like EPEL
+  - Pre-commit the assets to the repo via a separate CI workflow (e.g., a GitHub Action that clones upstream repos, downloads artifacts, or runs an external build system like PNC, then commits the results so the Dockerfile can simply `COPY` them).
 
-> **Red Hat note:** Generic fetcher entries require a policy exception for productized builds. Prefer the alternatives above (multi-stage copy, base image selection, building from source) when possible.
+> **Red Hat note:** Generic fetcher entries are frowned upon, especially for binary files, because they obfuscate what the actual dependencies are in the software bill of materials (SBOM). For this reason, all generic fetcher entries require a policy exception for productized builds. Use the alternatives above when possible.
 
-Each network access point maps to a hermeto package manager config (see [Configuring hermeto-test.json](#configuring-hermeto-testjson)) or needs a manual workaround.
-
-Only network access in the Dockerfile matters. A repo may contain lockfiles (e.g., `package-lock.json` for a documentation site, or `requirements.txt` for a test suite) that are never referenced by the container build -- these do not need hermeto entries. The Dockerfile is your guide, not the repo's file listing.
-
-Multiple commands using the same package manager still map to a single hermeto entry. For example, a Dockerfile might run `npm ci` for a full install during the build stage and then `npm install --omit=dev` to prune to production dependencies. Both draw from the same prefetched cache -- hermeto prefetches everything in the lockfile, and each `npm` command finds what it needs regardless of flags like `--omit=dev` or `--ignore-scripts`.
+Not all dependency fetching in the source repo needs to be addressed; only those specifically in the Dockerfile matters. A repo may contain lockfiles that are never referenced by the container build (e.g., `package-lock.json` for a documentation site, or `requirements.txt` for a test suite) -- these do not need hermeto entries. The Dockerfile is your guide, not the repo's file listing.
+[TODO add a note about scripts. if the dockerfile runs a script, that script needs to be investigated as if it was inlined into the dockerfile] 
+Multiple commands using the same package manager will map to a single hermeto entry. For example, a Dockerfile might run `npm ci` for a full install during the build stage and then `npm install --omit=dev` to prune to production dependencies. Both draw from the same prefetched cache. Hermeto prefetches everything in the lockfile, and each `npm` command will find what it needs from the cache, and should work regardless of flags like `--omit=dev` or `--ignore-scripts`.
 
 If the project has multiple Dockerfiles, identify which one is the target for hermetic builds. Also check whether the Dockerfile requires additional build inputs (argfiles, build-args, `.env` files) that affect what gets installed.
 
@@ -82,9 +92,10 @@ If the project has multiple Dockerfiles, identify which one is the target for he
 
 Getting a hermetic build working is an iterative process. The core loop for each package manager is:
 
-1. Add the manager to `hermeto-test.json` -- start with the simplest valid config (just `type` and `path`), then add options as needed (e.g., `binary` for wheels, `requirements_build_files` for sdists)
+1. Add manager config to `hermeto-test.json` -- start with the simplest valid config (just `type` and `path`), then add options as needed (e.g. for python builds, `binary` for binary wheels, `requirements_build_files` for building from source distributions)
 2. Run `hermeto fetch-deps` -- expect this to fail at first while you refine the config
 3. Fix issues (missing lockfiles, wrong options, version mismatches) and re-run until fetch-deps succeeds
+[TODO add a step very briefly describing the hermeto inject and env stuff]
 4. Run a build to verify the prefetched deps actually work
 
 You can work through package managers one at a time — add one to `hermeto-test.json`, run `fetch-deps` until it passes, then add the next. While iterating, build without `--network none` to verify the prefetched deps are consumed correctly without blocking other managers that aren't configured yet. Once all managers pass `fetch-deps`, add `--network none` to confirm the build is fully hermetic end-to-end.
@@ -93,14 +104,19 @@ Alternatively, you can configure all managers in `hermeto-test.json` first, get 
 
 ## Configuring `hermeto-test.json`
 
-> **`hermeto-test.json` is for local testing only.** You do not commit this file. Once your hermetic build works locally, copy the JSON contents into the `prefetch-input` parameter of the prefetch task in your `.tekton/` PipelineRun YAML. See [What to Commit](#what-to-commit) for the full checklist.
+> **`hermeto-test.json` is for local testing only.** This file is not meant to be committed directly to the repository. Once your hermetic build works locally, copy the JSON contents into the `prefetch-input` parameter of the prefetch task in your `.tekton/` PipelineRun YAML. See [What to Commit](#what-to-commit) for the full checklist.
+[TODO add a note that there is a feature request in place to be able to reference a hermeto.json in the repo rather than have it only in the tekton file - ask me for more details] 
 
 The hermeto config is a JSON array of package manager objects, each with a `type` field and manager-specific options. For single-manager configs, the pipeline also accepts a bare JSON object (e.g., `{"type": "gomod", "path": "."}`) without the array wrapper.
 
 **`path` is relative to the repo root, not to `path-context`.** In a Konflux pipeline, the `path-context` parameter sets the Docker build context directory, and the `dockerfile` parameter locates the Dockerfile relative to that context. The `path` field in the hermeto config is independent — it is always relative to the repo root (where hermeto's `--source` points). For subdirectory builds, these often have the same value (e.g., `path-context: ray-operator` and `"path": "ray-operator"`), but they serve different purposes and can diverge.
 
 Hermeto supports the following package managers -- jump to the one(s) your project uses:
-
+[TODO move this table to the bottom of this section, so that they read the section and then immediately can jump to where they need to go]
+[TODO add links at the bottom of each manager section
+- one to go to this table
+- another to jump to the next step in the build process
+]
 | Type | Language | Section |
 |------|----------|---------|
 | `pip` | Python | [pip (Python)](#pip-python) |
@@ -147,9 +163,9 @@ Once `fetch-deps` is used to download the dependencies, some additional configur
 
 [Hermeto pip docs](https://hermetoproject.github.io/hermeto/latest/pip/)
 
-Hermeto requires a fully resolved `requirements.txt` with all transitive dependencies pinned to exact versions (e.g., `package==1.2.3`). Hashes are optional but recommended for PyPI packages, and mandatory for HTTPS URL dependencies. If any of your dependencies are sdists (no pre-built wheel available), you also need a `requirements-build.txt` listing their PEP 517 build backends. See the [Python guide](hermeto-python.md#python-requirements) for how to generate these files.
+Hermeto requires a fully resolved `requirements.txt` with all transitive dependencies pinned to exact versions (e.g., `package==1.2.3`). Hashes are optional but recommended for PyPI packages, and mandatory for HTTPS URL dependencies. If any of your dependencies are sdists (no pre-built wheel available), you also need a `requirements-build.txt` listing their PEP 517 build backends. [TODO I want the following sentence to be something like, hermetic python builds are pretty hard so there's a separate guide that goes into detail on this"] See the [Python guide](hermeto-python.md#python-requirements) for how to generate these files.
 
-Some packages lack wheels or sdists on PyPI for certain architectures -- this is common on ppc64le and s390x. See the [Python guide's AIPCC section](hermeto-python.md#using-aipcc-wheels) to review how to leverage pre-built wheels, or [Building from Source](hermeto-python.md#building-from-source-for-missing-architectures) for how to build packages like torch from source tarballs.
+Some packages lack wheels or sdists on PyPI for certain architectures -- it is common to see a lack of ppc64le and s390x support. The [Python guide's AIPCC section](hermeto-python.md#using-aipcc-wheels) has informatino on how to leverage pre-built wheels from the AIPCC team. Alternatively, the [Building from Source section](hermeto-python.md#building-from-source-for-missing-architectures) explains for how to build packages like torch from source tarballs.
 
 **Config fields:**
 
@@ -162,12 +178,14 @@ Some packages lack wheels or sdists on PyPI for certain architectures -- this is
 
 **Example — minimal:**
 
+This configuration will fetch sdists for all the packages listed in requirements.txt
 ```json
 {"type": "pip", "path": ".", "requirements_files": ["requirements.txt"]}
 ```
 
 **Example — with binary wheels and build deps:**
 
+This configuration will fetch binary wheels for all packages listed in either requirements.txt or requirements-build.txt, matching the listed architectures. If a package does not supply a wheel for a given architecture, a sdist will be pulled instead.
 ```json
 {
   "type": "pip",
@@ -476,9 +494,9 @@ Some package managers need config files created or modified to point at the loca
 
 ```bash
 podman build . \
-  --volume "$(realpath ./.hermeto)":/cachi2/output:Z \
-  --volume "$(realpath ./.hermeto.env)":/cachi2/cachi2.env:Z \
-  --volume "$(realpath ./.hermeto)/deps/rpm/$(uname -m)/repos.d":/etc/yum.repos.d:Z \
+  --volume "$(realpath ./.hermeto)":/cachi2/output:z \
+  --volume "$(realpath ./.hermeto.env)":/cachi2/cachi2.env:z \
+  --volume "$(realpath ./.hermeto)/deps/rpm/$(uname -m)/repos.d":/etc/yum.repos.d:z \
   --network none \
   -f .hermeto/Dockerfile.konflux
 ```
@@ -757,7 +775,7 @@ Use [rpm-lockfile-prototype](https://github.com/konflux-ci/rpm-lockfile-prototyp
 curl https://raw.githubusercontent.com/konflux-ci/rpm-lockfile-prototype/refs/heads/main/Containerfile \
    | podman build -t localhost/rpm-lockfile-prototype -
 
-podman run --rm -v "${PWD}:/work:Z" localhost/rpm-lockfile-prototype:latest --outfile=rpms.lock.yaml rpms.in.yaml
+podman run --rm -v "${PWD}:/work:z" localhost/rpm-lockfile-prototype:latest --outfile=rpms.lock.yaml rpms.in.yaml
 ```
 
 This produces `rpms.lock.yaml` with exact URLs and checksums for every RPM (including transitive dependencies) across all declared architectures. The lockfile is typically large -- thousands of lines is normal. Commit both `rpms.in.yaml` and `rpms.lock.yaml`.
