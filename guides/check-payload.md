@@ -179,44 +179,32 @@ Issues can arise when:
 
 For most RHOAI Python images, using the standard UBI Python base image and installing dependencies with pip is sufficient. check-payload validates the ELF-level linkage, not Python's runtime crypto configuration.
 
-## Suppressing Known False Positives
+## Handling False Positives
 
-Some binaries legitimately don't use cryptography but fail check-payload because they're statically linked (e.g., `pandoc`, `py-spy`, `tini-static`). Add `--print-exceptions` (`-p`) to the scan command to generate TOML exception rules:
+Some binaries legitimately don't use cryptography but fail check-payload because they're statically linked (e.g., `pandoc`, `py-spy`, `tini-static`). You cannot work around these locally — the Konflux build and release pipeline runs check-payload with its built-in configuration, and there is no way to pass a custom `config.toml` to the pipeline. Any component that fails check-payload will block the RHOAI operator release until the failure is resolved.
+
+If a binary in your image meets **both** of these conditions:
+
+1. It is necessary for the runtime of the image (can't be removed)
+2. It performs no cryptographic operations
+
+Then submit a PR to [openshift/check-payload](https://github.com/openshift/check-payload) to add an exception to the global `config.toml`. Use the `--print-exceptions` (`-p`) flag to generate the exact TOML syntax for your PR:
 
 ```bash
-podman run --platform linux/amd64 --rm --entrypoint bash \
-  check-payload:local -c "
-    skopeo copy --remove-signatures \
-      docker://quay.io/your-org/your-image@sha256:abc123 \
-      oci:/tmp/image:scan &&
-    umoci unpack --image /tmp/image:scan /tmp/unpacked &&
-    /check-payload scan local --path /tmp/unpacked/rootfs --print-exceptions
-  "
+./scripts/check-payload.sh -i quay.io/your-org/your-image@sha256:abc123 --print-exceptions
 ```
 
 This prints TOML blocks like:
 
 ```toml
-[[ignore]]
+[[payload.my-component.ignore]]
 error = "ErrNotDynLinked"
 files = ["/usr/local/bin/pandoc"]
 ```
 
-You can save these to a `config.toml` file and mount it into the container:
+Include this in your PR to [config.toml](https://github.com/openshift/check-payload/blob/main/config.toml), with a comment explaining why the binary is safe to exclude and a Jira ticket tracking the exception. See the existing RHOAI exceptions in that file (tracked under RHOAIENG-58626) for the expected format.
 
-```bash
-podman run --platform linux/amd64 --rm --entrypoint bash \
-  -v ./my-config.toml:/my-config.toml:ro \
-  check-payload:local -c "
-    skopeo copy --remove-signatures \
-      docker://quay.io/your-org/your-image@sha256:abc123 \
-      oci:/tmp/image:scan &&
-    umoci unpack --image /tmp/image:scan /tmp/unpacked &&
-    /check-payload scan local --path /tmp/unpacked/rootfs --config /my-config.toml
-  "
-```
-
-The default config already includes exceptions for known RHOAI images (workbench pandoc, py-spy, etc.) tracked under RHOAIENG-58626.
+If the binary is **not** necessary for the image, the better fix is to remove it from the Dockerfile entirely — fewer binaries means fewer FIPS findings to deal with.
 
 ## Useful Flags
 
