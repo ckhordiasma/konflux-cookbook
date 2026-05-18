@@ -20,7 +20,11 @@ Running it locally catches these issues before they surface in the Konflux relea
 
 ## Quick Start: Scan an Image
 
-### 1. Build the check-payload container image (one-time setup)
+check-payload needs a Linux environment with `podman` and `nm` (from binutils) to inspect ELF executables. On macOS, podman runs containers inside a Linux VM, so the simplest approach is to run the entire scan inside a container.
+
+The check-payload container image (built from [Dockerfile.upstream](https://github.com/openshift/check-payload/blob/main/Dockerfile.upstream)) includes all required tools: check-payload itself plus `skopeo` and `umoci` for pulling and unpacking images.
+
+### 1. Build the check-payload container (one-time setup)
 
 ```bash
 git clone https://github.com/openshift/check-payload.git
@@ -28,25 +32,42 @@ cd check-payload
 podman build --platform linux/amd64 -f Dockerfile.upstream -t check-payload:local .
 ```
 
-Use `--platform linux/amd64` to ensure the build downloads the correct x86_64 tooling bundled in the Dockerfile, regardless of your host architecture. This takes a few minutes the first time.
+`--platform linux/amd64` ensures the build downloads the correct x86_64 tooling bundled in the Dockerfile (oc, opm, umoci), regardless of your host architecture. This takes a few minutes the first time.
 
 ### 2. Scan an image from a registry
 
 ```bash
-podman run --platform linux/amd64 --privileged \
-  check-payload:local scan image \
-  --spec quay.io/your-org/your-image@sha256:abc123...
+podman run --platform linux/amd64 --rm --entrypoint bash \
+  check-payload:local -c "
+    skopeo copy --remove-signatures \
+      docker://quay.io/your-org/your-image@sha256:abc123 \
+      oci:/tmp/image:scan &&
+    umoci unpack --image /tmp/image:scan /tmp/unpacked &&
+    /check-payload scan local --path /tmp/unpacked/rootfs
+  "
 ```
 
-The `--privileged` flag is required because check-payload uses `podman image mount` internally to access the container filesystem. The inner podman pulls the image from the registry, mounts it, walks the filesystem for ELF executables, and runs them through the FIPS validation engine.
+This pulls the image with `skopeo`, unpacks it with `umoci`, and scans the resulting rootfs — all inside one container. No podman-in-podman, no `--privileged`, no VM SSH.
 
-If the registry requires authentication, pass your pull secret:
+**Notes:**
+- `--remove-signatures` is required because OCI layout doesn't support signatures
+- The `oci:/tmp/image:scan` format requires a tag after the colon (here `scan` — the name is arbitrary)
+- For digest references, use the `@sha256:...` format without a tag: `docker://registry/image@sha256:abc123`
+- For tag references, use the tag directly: `docker://registry/image:v1.0`
+- Don't combine both tag and digest (`image:v1.0@sha256:...`) — skopeo doesn't support that
+
+If the registry requires authentication, mount your pull secret into the container:
 
 ```bash
-podman run --platform linux/amd64 --privileged \
+podman run --platform linux/amd64 --rm --entrypoint bash \
   -v "${XDG_RUNTIME_DIR}/containers/auth.json:/run/containers/0/auth.json:ro" \
-  check-payload:local scan image \
-  --spec quay.io/your-org/your-image@sha256:abc123...
+  check-payload:local -c "
+    skopeo copy --remove-signatures \
+      docker://quay.io/your-org/your-image@sha256:abc123 \
+      oci:/tmp/image:scan &&
+    umoci unpack --image /tmp/image:scan /tmp/unpacked &&
+    /check-payload scan local --path /tmp/unpacked/rootfs
+  "
 ```
 
 ### 3. Read the results
@@ -73,22 +94,6 @@ podman run --platform linux/amd64 --privileged \
 |                |          |          | /usr/local/bin/myapp                         | go binary does not enable GOEXPERIMENT=strictfipsruntime |       |
 +----------------+----------+----------+----------------------------------------------+------------------------------------------+-------+
 ```
-
-## Scanning a Locally Built Image
-
-If you've built an image locally and want to scan it before pushing to a registry:
-
-1. **Push to your personal namespace** and then scan from the registry:
-
-    ```bash
-    podman build -t quay.io/your-user/my-image:fips-test -f Dockerfile.konflux .
-    podman push quay.io/your-user/my-image:fips-test
-    podman run --platform linux/amd64 --privileged \
-      check-payload:local scan image \
-      --spec quay.io/your-user/my-image:fips-test
-    ```
-
-2. **Or** scan directly from local podman storage by tagging the image and scanning inside the podman machine VM — see [Running Inside the Podman Machine VM](#running-inside-the-podman-machine-vm) below.
 
 ## Common FIPS Errors and Fixes
 
@@ -176,31 +181,39 @@ For most RHOAI Python images, using the standard UBI Python base image and insta
 
 ## Suppressing Known False Positives
 
-Some binaries legitimately don't use cryptography but fail check-payload because they're statically linked (e.g., `pandoc`, `py-spy`, `tini-static`). Use `--print-exceptions` (`-p`) to generate TOML exception rules:
+Some binaries legitimately don't use cryptography but fail check-payload because they're statically linked (e.g., `pandoc`, `py-spy`, `tini-static`). Add `--print-exceptions` (`-p`) to the scan command to generate TOML exception rules:
 
 ```bash
-podman run --platform linux/amd64 --privileged \
-  check-payload:local scan image \
-  --spec quay.io/your-org/your-image@sha256:abc123 \
-  --print-exceptions
+podman run --platform linux/amd64 --rm --entrypoint bash \
+  check-payload:local -c "
+    skopeo copy --remove-signatures \
+      docker://quay.io/your-org/your-image@sha256:abc123 \
+      oci:/tmp/image:scan &&
+    umoci unpack --image /tmp/image:scan /tmp/unpacked &&
+    /check-payload scan local --path /tmp/unpacked/rootfs --print-exceptions
+  "
 ```
 
 This prints TOML blocks like:
 
 ```toml
-[[payload.my-component.ignore]]
+[[ignore]]
 error = "ErrNotDynLinked"
 files = ["/usr/local/bin/pandoc"]
 ```
 
-You can add these to a custom `config.toml` and pass it with `--config`:
+You can save these to a `config.toml` file and mount it into the container:
 
 ```bash
-podman run --platform linux/amd64 --privileged \
-  -v ./my-config.toml:/config.toml:ro \
-  check-payload:local scan image \
-  --spec quay.io/your-org/your-image@sha256:abc123 \
-  --config /config.toml
+podman run --platform linux/amd64 --rm --entrypoint bash \
+  -v ./my-config.toml:/my-config.toml:ro \
+  check-payload:local -c "
+    skopeo copy --remove-signatures \
+      docker://quay.io/your-org/your-image@sha256:abc123 \
+      oci:/tmp/image:scan &&
+    umoci unpack --image /tmp/image:scan /tmp/unpacked &&
+    /check-payload scan local --path /tmp/unpacked/rootfs --config /my-config.toml
+  "
 ```
 
 The default config already includes exceptions for known RHOAI images (workbench pandoc, py-spy, etc.) tracked under RHOAIENG-58626.
@@ -217,29 +230,6 @@ The default config already includes exceptions for known RHOAI images (workbench
 | `--filter-files path1,path2` | Skip specific files |
 | `--filter-dirs dir1,dir2` | Skip specific directories |
 
-## Running Inside the Podman Machine VM
-
-On macOS, you can also SSH into the podman machine VM to run check-payload directly. This avoids the podman-in-podman overhead and lets you scan locally built images from podman's storage:
-
-```bash
-# Build your image (runs in the VM via podman)
-podman build -t my-image:test -f Dockerfile.konflux .
-
-# SSH into the VM
-podman machine ssh
-
-# Inside the VM: install dependencies and build check-payload
-sudo dnf install -y git golang binutils
-git clone https://github.com/openshift/check-payload.git
-cd check-payload
-make
-
-# Scan the locally built image
-sudo ./check-payload scan image --spec localhost/my-image:test
-```
-
-This is a heavier setup but useful when you need to scan images that aren't in a registry.
-
 ## Checklist
 
 Before pushing an image to Konflux, verify:
@@ -248,4 +238,4 @@ Before pushing an image to Konflux, verify:
 - [ ] FIPS toggles (`ARG FIPS_ENABLED`) removed — FIPS path hardcoded
 - [ ] Base image is a FIPS-certified RHEL/UBI version
 - [ ] No statically linked binaries that perform cryptography
-- [ ] `check-payload scan image` passes (exit code 0)
+- [ ] `check-payload scan local` passes (exit code 0)
