@@ -181,7 +181,9 @@ For most RHOAI Python images, using the standard UBI Python base image and insta
 
 ## Handling False Positives
 
-Some binaries legitimately don't use cryptography but fail check-payload because they're statically linked (e.g., `pandoc`, `py-spy`, `tini-static`). You cannot work around these locally — the Konflux build and release pipeline runs check-payload with its built-in configuration, and there is no way to pass a custom `config.toml` to the pipeline. Any component that fails check-payload will block the RHOAI operator release until the failure is resolved.
+Some binaries legitimately don't use cryptography but fail check-payload because they're statically linked (e.g., `pandoc`, `py-spy`, `tini-static`). While check-payload supports custom `config.toml` files for local use, this does not help with the release pipeline.
+
+> **RHOAI note:** The Konflux build and release pipeline runs check-payload with its built-in configuration — there is no way to pass a custom `config.toml`. Any component that fails check-payload will block the RHOAI operator release until the failure is resolved through a formal exception. The RHOAI DevOps team has also implemented a build-time FIPS check on downstream CI builds, to allow for these issues to be caught earlier.
 
 If a binary in your image meets **both** of these conditions:
 
