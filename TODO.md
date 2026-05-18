@@ -13,7 +13,7 @@
 
 ## FIPS Compliance
 
-- [ ] Guide on running check-payload locally to detect FIPS issues before pushing to Konflux. Include common fixes: Go builds (`GOEXPERIMENT=strictfipsruntime`, `-tags strictfipsruntime`, `CGO_ENABLED=1`), FIPS build hardcoding in Dockerfile.konflux (removing dev toggles like `FIPS_ENABLED`), Python/OpenSSL considerations
+- [x] Guide on running check-payload locally to detect FIPS issues before pushing to Konflux — see [check-payload.md](guides/check-payload.md)
 
 ## Conforma Compliance
 
