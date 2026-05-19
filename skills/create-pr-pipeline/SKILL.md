@@ -6,7 +6,7 @@ version: 1.0.0
 
 # Create a Temporary Pull Request Pipeline
 
-Read the reference doc at `guides/create-pr-pipeline.md` (relative to the plugin root) for the full procedure. Follow the steps below using that doc as your guide.
+Read `guides/create-pr-pipeline.md` (relative to the plugin root) thoroughly before starting. It is the source of truth for the PR pipeline procedure — do not duplicate its content, reference it as you go.
 
 ## Steps
 
