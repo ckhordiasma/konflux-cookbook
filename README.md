@@ -104,10 +104,39 @@ flowchart TD
 
 ## Using as a Claude Code plugin
 
-Install locally for testing:
+### From the git repo (recommended)
+
+Add the plugin to your project's `.claude/settings.json`:
+
+```json
+{
+  "plugins": [
+    "https://github.com/ckodama/konflux-cookbook"
+  ]
+}
+```
+
+Or add it to your user settings at `~/.claude/settings.json` to make it available across all projects.
+
+### From a local directory
+
+If you have the repo cloned locally:
 
 ```
 claude --plugin-dir /path/to/konflux-cookbook
 ```
+
+### Updating the plugin
+
+If installed via git URL, Claude Code fetches the latest version from the default branch automatically on each session start.
+
+If installed from a local directory, pull the latest changes yourself:
+
+```
+cd /path/to/konflux-cookbook
+git pull
+```
+
+### Usage
 
 Once installed, the skills are available as slash commands (e.g., `/konflux-cookbook:create-pr-pipeline`).

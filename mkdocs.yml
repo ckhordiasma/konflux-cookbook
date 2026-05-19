@@ -2,6 +2,7 @@ site_name: Konflux Cookbook
 site_description: Guides and tools for production-ready builds on Konflux
 repo_url: https://github.com/ckhordiasma/konflux-cookbook
 repo_name: ckhordiasma/konflux-cookbook
+edit_uri: edit/main/guides/
 
 theme:
   name: material
@@ -11,6 +12,7 @@ theme:
     - navigation.expand
     - navigation.top
     - content.code.copy
+    - content.action.edit
     - toc.integrate
   palette:
     - scheme: default
