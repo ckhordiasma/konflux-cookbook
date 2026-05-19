@@ -108,7 +108,11 @@ Open a PR against the `main` branch of your RHDS component repo with your hermet
 
 ### Step 2: Update the Pull Request PipelineRun
 
-The `main` branch should already have a pull request PipelineRun in the `.tekton/` folder that targets the `rhoai-tenant` namespace. Update it with the changes needed for your hermetic build:
+The `main` branch should already have a pull request PipelineRun in the `.tekton/` folder that targets the `rhoai-tenant` namespace. Update it with the changes needed for your hermetic build.
+
+See [How to Test Build Changes on an RHOAI Release Branch](create-pr-pipeline.md) for how to create a temporary pull request pipeline based on the existing push PipelineRun.
+
+Changes needed:
 
 - **`prefetch-input`** -- your hermeto JSON config (see [Configuring hermeto-test.json](hermeto-prefetch.md#configuring-hermeto-testjson))
 - **`hermetic`** -- set to `"true"` if your build is fully hermetic

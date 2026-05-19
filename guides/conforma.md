@@ -11,6 +11,12 @@ Before images can ship through a release pipeline, they must pass Conforma (Ente
 - Validate a specific snapshot before triggering a release
 - Understand which components are failing and why
 
+## Important: Conforma requires Konflux-built images
+
+Conforma validates artifacts that are produced during the Konflux build pipeline — image signatures, attestations, SBOMs, and build provenance. These artifacts don't exist for locally-built images, so conforma will fail against them.
+
+This means you can run conforma against images built by a Konflux pipeline (push builds, pull request builds, etc.), but **not** against images you built locally (e.g. with `podman build` or `docker build`).
+
 ## Prerequisites
 
 You need the following tools installed and configured:
