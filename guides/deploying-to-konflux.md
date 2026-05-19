@@ -94,7 +94,7 @@ ec validate image \
   --timeout 30m0s
 ```
 
-See the [Conforma validation guide](test-conforma.md) for the full walkthrough, including how to interpret results and debug failures. 
+See the [Conforma validation guide](conforma.md) for the full walkthrough, including how to interpret results and debug failures. 
 
 ## Apply to Downstream RHDS Builds
 
@@ -138,7 +138,7 @@ ec validate image \
   --timeout 30m0s
 ```
 
-Find the image URI in the **Results** section of your PipelineRun in the Konflux web UI (`IMAGE_URL` and `IMAGE_DIGEST`). See the [Conforma validation guide](test-conforma.md) for the full walkthrough.
+Find the image URI in the **Results** section of your PipelineRun in the Konflux web UI (`IMAGE_URL` and `IMAGE_DIGEST`). See the [Conforma validation guide](conforma.md) for the full walkthrough.
 
 ### Step 5: Sync Changes Back to RHDS Konflux-Central
 

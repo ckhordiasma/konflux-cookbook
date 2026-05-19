@@ -1,12 +1,12 @@
 ---
-name: test-conforma
+name: conforma
 description: Run Conforma (Enterprise Contract) validation against a Konflux snapshot or a single image to check release policy compliance
 version: 1.0.0
 ---
 
 # Run Conforma Validation
 
-Read the reference doc at `guides/test-conforma.md` (relative to the plugin root) for the full procedure. Follow the steps below using that doc as your guide.
+Read the reference doc at `guides/conforma.md` (relative to the plugin root) for the full procedure. Follow the steps below using that doc as your guide.
 
 ## Steps
 

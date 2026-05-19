@@ -31,7 +31,7 @@ konflux-cookbook/
 | Guide | Description |
 |-------|-------------|
 | [create-pr-pipeline](guides/create-pr-pipeline.md) | Create a temporary pull request PipelineRun from a push PipelineRun to test build changes on an RHOAI release branch |
-| [conforma](guides/test-conforma.md) | Run Conforma (Enterprise Contract) validation against a single image or Konflux snapshot to check release policy compliance |
+| [conforma](guides/conforma.md) | Run Conforma (Enterprise Contract) validation against a single image or Konflux snapshot to check release policy compliance |
 | [hermeto-prefetch](guides/hermeto-prefetch.md) | Set up hermetic builds with Hermeto (pre-fetch dependencies for offline container builds) |
 | [hermeto-python](guides/hermeto-python.md) | Python requirements, AIPCC wheels, and source builds for hermetic Konflux builds |
 | [deploying-to-konflux](guides/deploying-to-konflux.md) | Deploy locally-working hermetic build config to Konflux pipelines for RHOAI components |
