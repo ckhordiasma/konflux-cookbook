@@ -95,6 +95,29 @@ podman run --platform linux/amd64 --rm --entrypoint bash \
 +----------------+----------+----------+----------------------------------------------+------------------------------------------+-------+
 ```
 
+### Using the script
+
+The [`scripts/check-payload.sh`](../scripts/check-payload.sh) script wraps all the steps above into a single command:
+
+```bash
+# One-time setup: build the check-payload container
+./scripts/check-payload.sh --install
+
+# Scan a registry image
+./scripts/check-payload.sh -i quay.io/your-org/your-image@sha256:abc123
+
+# Scan a locally built image
+podman build -t my-image:test -f Dockerfile.konflux .
+./scripts/check-payload.sh -i localhost/my-image:test
+
+# Scan with exception output for a check-payload PR
+./scripts/check-payload.sh -i quay.io/your-org/your-image@sha256:abc123 --print-exceptions
+```
+
+The script auto-detects local images (those without a registry hostname) and exports them via `podman save` before scanning. Registry images are pulled directly with `skopeo` inside the container.
+
+Run `./scripts/check-payload.sh --help` for all options.
+
 ## Common FIPS Errors and Fixes
 
 ### Go binary errors

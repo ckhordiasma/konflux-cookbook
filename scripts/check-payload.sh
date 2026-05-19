@@ -6,6 +6,7 @@ CHECK_PAYLOAD_REPO=${CHECK_PAYLOAD_REPO:-https://github.com/openshift/check-payl
 usage() {
   cat <<EOF
 Usage: check-payload.sh -i <image> [options]
+       check-payload.sh --install
 
 Run check-payload FIPS compliance scan against a container image.
 
@@ -15,8 +16,8 @@ no podman-in-podman, no VM SSH required.
 
 Options:
   -i, --image IMAGE           Container image reference (required)
-                              e.g. quay.io/org/image@sha256:abc123
-                              e.g. registry.access.redhat.com/ubi9/ubi-minimal:9.4
+                              Registry: quay.io/org/image@sha256:abc123
+                              Local:    localhost/my-image:test (auto-detected)
   -c, --config FILE           Custom check-payload config.toml file
   -o, --output-file FILE      Write report to file on the host
   -f, --output-format FMT     Output format: table, csv, markdown, html (default: table)
@@ -24,7 +25,7 @@ Options:
       --filter-dirs LIST      Comma-separated directories to skip
   -p, --print-exceptions      Print TOML exception rules for failures
   -v, --verbose               Enable verbose output
-      --build                 Force rebuild of the check-payload container
+      --install               Build the check-payload container image (one-time setup)
   -h, --help                  Show this help
 
 All options can also be set via environment variables:
@@ -43,16 +44,44 @@ while [ $# -gt 0 ]; do
     --filter-dirs)         FILTER_DIRS="$2"; shift 2 ;;
     -p|--print-exceptions) PRINT_EXCEPTIONS=true; shift ;;
     -v|--verbose)          VERBOSE=true; shift ;;
-    --build)               FORCE_BUILD=true; shift ;;
+    --install)             INSTALL=true; shift ;;
     -h|--help)             usage; exit 0 ;;
     *) echo "Unknown option: $1"; usage; exit 1 ;;
   esac
 done
 
+# --- Install mode ---
+
+if [ "$INSTALL" = "true" ]; then
+  echo "=== Building check-payload container ==="
+  TMPDIR=$(mktemp -d)
+  trap "rm -rf $TMPDIR" EXIT
+  git clone --depth 1 "$CHECK_PAYLOAD_REPO" "$TMPDIR/check-payload" 2>&1
+  podman build --platform linux/amd64 \
+    -f "$TMPDIR/check-payload/Dockerfile.upstream" \
+    -t "$CHECK_PAYLOAD_IMAGE" \
+    "$TMPDIR/check-payload" 2>&1
+  if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to build check-payload container"
+    exit 1
+  fi
+  echo ""
+  echo "check-payload container built as $CHECK_PAYLOAD_IMAGE"
+  [ -z "$IMAGE" ] && exit 0
+fi
+
+# --- Validate inputs ---
+
 if [ -z "$IMAGE" ]; then
   echo "ERROR: IMAGE (-i) is required"
   echo ""
   usage
+  exit 1
+fi
+
+if ! podman image exists "$CHECK_PAYLOAD_IMAGE" 2>/dev/null; then
+  echo "ERROR: check-payload container image not found: $CHECK_PAYLOAD_IMAGE"
+  echo "Run: $0 --install"
   exit 1
 fi
 
@@ -70,22 +99,17 @@ if echo "$IMAGE" | grep -q ':.*@sha256:'; then
   echo ""
 fi
 
-# --- Build check-payload container if needed ---
+# --- Detect local vs registry image ---
+# Images with a dot in the first path component are registry references
+# (e.g., quay.io/..., registry.access.redhat.com/...).
+# Images without a dot are local (e.g., my-image:test, localhost/my-image:test).
 
-if [ "$FORCE_BUILD" = "true" ] || ! podman image exists "$CHECK_PAYLOAD_IMAGE" 2>/dev/null; then
-  echo "=== Building check-payload container ==="
-  TMPDIR=$(mktemp -d)
-  trap "rm -rf $TMPDIR" EXIT
-  git clone --depth 1 "$CHECK_PAYLOAD_REPO" "$TMPDIR/check-payload" 2>&1
-  podman build --platform linux/amd64 \
-    -f "$TMPDIR/check-payload/Dockerfile.upstream" \
-    -t "$CHECK_PAYLOAD_IMAGE" \
-    "$TMPDIR/check-payload" 2>&1
-  if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to build check-payload container"
-    exit 1
+IS_LOCAL=false
+IMAGE_HOST=$(echo "$IMAGE" | cut -d'/' -f1)
+if ! echo "$IMAGE_HOST" | grep -q '\.'; then
+  if podman image exists "$IMAGE" 2>/dev/null; then
+    IS_LOCAL=true
   fi
-  echo ""
 fi
 
 # --- Assemble check-payload flags ---
@@ -128,10 +152,33 @@ elif [ -f "$HOME/.docker/config.json" ]; then
   VOLUME_MOUNTS="$VOLUME_MOUNTS -v $HOME/.docker/config.json:/run/containers/0/auth.json:ro"
 fi
 
+# --- Export local image if needed ---
+
+CLEANUP_TAR=""
+if [ "$IS_LOCAL" = "true" ]; then
+  echo "=== Exporting local image ==="
+  SAVE_DIR="$HOME/.cache/check-payload"
+  mkdir -p "$SAVE_DIR"
+  SAVE_PATH="$SAVE_DIR/image.tar"
+  podman save --format oci-archive -o "$SAVE_PATH" "$IMAGE" 2>&1
+  if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to export local image: $IMAGE"
+    exit 1
+  fi
+  VOLUME_MOUNTS="$VOLUME_MOUNTS -v $SAVE_PATH:/tmp/input.tar:ro"
+  SKOPEO_SRC="oci-archive:/tmp/input.tar"
+  CLEANUP_TAR="$SAVE_PATH"
+else
+  SKOPEO_SRC="docker://$IMAGE"
+fi
+
 # --- Run scan ---
 
 echo "=== Running check-payload FIPS scan ==="
 echo "Image: $IMAGE"
+if [ "$IS_LOCAL" = "true" ]; then
+  echo "Source: local podman storage"
+fi
 echo ""
 
 SECONDS=0
@@ -140,7 +187,7 @@ if [ -n "$OUTPUT_FILE" ]; then
     $VOLUME_MOUNTS \
     "$CHECK_PAYLOAD_IMAGE" -c "
       skopeo copy --remove-signatures \
-        docker://$IMAGE \
+        $SKOPEO_SRC \
         oci:/tmp/image:scan 2>&1 &&
       umoci unpack --image /tmp/image:scan /tmp/unpacked 2>&1 &&
       /check-payload scan local --path /tmp/unpacked/rootfs $SCAN_FLAGS
@@ -151,7 +198,7 @@ else
     $VOLUME_MOUNTS \
     "$CHECK_PAYLOAD_IMAGE" -c "
       skopeo copy --remove-signatures \
-        docker://$IMAGE \
+        $SKOPEO_SRC \
         oci:/tmp/image:scan 2>&1 &&
       umoci unpack --image /tmp/image:scan /tmp/unpacked 2>&1 &&
       /check-payload scan local --path /tmp/unpacked/rootfs $SCAN_FLAGS
@@ -159,6 +206,12 @@ else
   SCAN_EXIT=$?
 fi
 DURATION=$SECONDS
+
+# --- Cleanup ---
+
+if [ -n "$CLEANUP_TAR" ]; then
+  rm -f "$CLEANUP_TAR"
+fi
 
 echo ""
 echo "=== Summary ==="
