@@ -42,7 +42,7 @@ def start_conforma(application, policy_file, results_file, env_passthrough, stde
             env[key] = val
 
     stderr_fh = open(stderr_file, "w")
-    proc = subprocess.Popen(["bash", "test-conforma.sh"], env=env, stderr=stderr_fh)
+    proc = subprocess.Popen(["bash", "conforma.sh"], env=env, stderr=stderr_fh)
     proc._stderr_fh = stderr_fh
     proc._stderr_file = stderr_file
     return proc
