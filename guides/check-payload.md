@@ -1,6 +1,6 @@
 # Running check-payload Locally for FIPS Compliance
 
-> **Scope:** This guide covers running [check-payload](https://github.com/openshift/check-payload) locally to detect FIPS compliance issues in container images before pushing to Konflux. It targets RHOAI developers on macOS (Apple Silicon or x86) and Linux workstations with podman installed.
+> **Scope:** This guide covers running [check-payload](https://github.com/openshift/check-payload) locally to detect FIPS compliance issues in container images. It is intended for RHOAI developers who are looking to verify that there will be no issues productizing their codebase. 
 
 ## What check-payload Does
 
