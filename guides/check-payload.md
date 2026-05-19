@@ -47,8 +47,6 @@ podman run --platform linux/amd64 --rm --entrypoint bash \
   "
 ```
 
-This pulls the image with `skopeo`, unpacks it with `umoci`, and scans the resulting rootfs — all inside one container. No podman-in-podman, no `--privileged`, no VM SSH.
-
 **Notes:**
 - `--remove-signatures` is required because OCI layout doesn't support signatures
 - The `oci:/tmp/image:scan` format requires a tag after the colon (here `scan` — the name is arbitrary)
@@ -125,7 +123,7 @@ This is needed because the check-payload container can't access the host's podma
 
 ### Using the script
 
-The [`scripts/check-payload.sh`](../scripts/check-payload.sh) script wraps all the steps above into a single command:
+The [`scripts/check-payload.sh`](../scripts/check-payload.sh) script wraps all the steps above into a single command. Besides encapsulating the instructions above, it allows one to specify both a tag and a SHA (the tag will get stripped when passing into skopeo)
 
 ```bash
 # One-time setup: build the check-payload container
