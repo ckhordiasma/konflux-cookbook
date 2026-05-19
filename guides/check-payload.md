@@ -32,7 +32,7 @@ cd check-payload
 podman build --platform linux/amd64 -f Dockerfile.upstream -t check-payload:local .
 ```
 
-`--platform linux/amd64` ensures the build downloads the correct x86_64 tooling bundled in the Dockerfile (oc, opm, umoci), regardless of your host architecture. This takes a few minutes the first time.
+`--platform linux/amd64` is required because `Dockerfile.upstream` hardcodes x86_64 download URLs for `oc`, `opm`, and `umoci`. Without it, an arm64 build would produce a container with broken x86_64 binaries. check-payload itself is architecture-independent — this is purely a limitation of the upstream Dockerfile. On arm64 hosts this means the container runs under QEMU emulation, which is slower but functional.
 
 ### 2. Scan an image from a registry
 
@@ -69,6 +69,34 @@ podman run --platform linux/amd64 --rm --entrypoint bash \
     /check-payload scan local --path /tmp/unpacked/rootfs
   "
 ```
+
+### Scanning a locally built image
+
+If you've built an image locally with `podman build`, export it as an OCI archive and mount it into the check-payload container:
+
+```bash
+# Build your image
+podman build -t my-image:test -f Dockerfile.konflux .
+
+# Export to OCI archive
+podman save --format oci-archive -o /tmp/my-image.tar localhost/my-image:test
+
+# Scan the exported archive
+podman run --platform linux/amd64 --rm --entrypoint bash \
+  -v /tmp/my-image.tar:/tmp/input.tar:ro \
+  check-payload:local -c "
+    skopeo copy --remove-signatures \
+      oci-archive:/tmp/input.tar \
+      oci:/tmp/image:scan &&
+    umoci unpack --image /tmp/image:scan /tmp/unpacked &&
+    /check-payload scan local --path /tmp/unpacked/rootfs
+  "
+
+# Clean up
+rm /tmp/my-image.tar
+```
+
+This is needed because the check-payload container can't access the host's podman storage directly. The `podman save` exports the image as a portable OCI archive, which is then mounted into the container for skopeo to read via `oci-archive:`.
 
 ### 3. Read the results
 
