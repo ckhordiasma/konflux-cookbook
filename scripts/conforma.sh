@@ -132,7 +132,7 @@ else
   SECONDS=0
   if [ "$LATEST_RC" = "true" ]; then
     # Find the latest successful release via Release CRs
-    LATEST_RC_JSON=$(oc get releases -l "appstudio.openshift.io/application=$APPLICATION" --sort-by=.metadata.creationTimestamp -o json \
+    LATEST_RC_JSON=$(kubectl get releases -l "appstudio.openshift.io/application=$APPLICATION" --sort-by=.metadata.creationTimestamp -o json \
       | jq -r '[.items[] | select(.status.conditions[]? | .type == "Released" and .reason == "Succeeded")] | last | "\(.metadata.name)\t\(.spec.snapshot)"')
     RELEASE_NAME=$(echo "$LATEST_RC_JSON" | cut -f1)
     SNAPSHOT=$(echo "$LATEST_RC_JSON" | cut -f2)
@@ -143,7 +143,7 @@ else
     echo "Release: $RELEASE_NAME"
     echo "Latest release snapshot: $SNAPSHOT (${SECONDS}s)"
   elif [ -z "$SNAPSHOT" ]; then
-    SNAPSHOT=$(oc get snapshots -l "pac.test.appstudio.openshift.io/event-type in (push,incoming),appstudio.openshift.io/application=$APPLICATION" --sort-by=.metadata.creationTimestamp | tail -1 | awk '{print $1}')
+    SNAPSHOT=$(kubectl get snapshots -l "pac.test.appstudio.openshift.io/event-type in (push,incoming),appstudio.openshift.io/application=$APPLICATION" --sort-by=.metadata.creationTimestamp | tail -1 | awk '{print $1}')
     echo "Snapshot: $SNAPSHOT (${SECONDS}s)"
   else
     echo "Snapshot: $SNAPSHOT (${SECONDS}s)"
@@ -160,7 +160,7 @@ else
   if [ -n "$FILTER" ]; then
     JQ_FILTER="$JQ_FILTER | .spec.components |= [.[] | select(.name | test(\"$FILTER\"))]"
   fi
-  oc get snapshot $SNAPSHOT -o json | jq "$JQ_FILTER" > $SNAPSHOT_FILE
+  kubectl get snapshot $SNAPSHOT -o json | jq "$JQ_FILTER" > $SNAPSHOT_FILE
   COMPONENT_COUNT=$(jq '.spec.components | length' "$SNAPSHOT_FILE")
   if [ -n "$FILTER" ]; then
     echo "Components: $COMPONENT_COUNT matching /$FILTER/ (${SECONDS}s)"

@@ -20,21 +20,38 @@ This means you can run conforma against images built by a Konflux pipeline (push
 ## Prerequisites
 
 You need the following tools installed and configured:
-- **`oc`** -- OpenShift CLI, logged into the Konflux cluster
+- **`kubectl`** -- Kubernetes CLI, logged into the Konflux cluster
 - **`ec`** -- [Enterprise Contract CLI](https://github.com/enterprise-contract/ec-cli)
 - **`jq`** -- JSON processor (only needed for snapshot-based validation)
+
+### Authenticating kubectl with oc login
+
+The easiest way to authenticate `kubectl` against an OpenShift cluster is to use `oc login --web`, which opens a browser for SSO authentication. The `oc` CLI writes credentials to your kubeconfig (`~/.kube/config`), and `kubectl` reads the same file — so after logging in, `kubectl` commands just work:
+
+```bash
+oc login --web --server=https://api.stone-prod-p02.hjvn.p1.openshiftapps.com:6443/
+kubectl get namespaces   # works immediately — uses the same kubeconfig
+```
+
+You only need `oc` for the initial login. All other commands in this guide use `kubectl`.
+
+The Konflux cluster API URLs are:
+- **rh01** (midstream ODH builds): `https://api.stone-prd-rh01.pg1f.p1.openshiftapps.com:6443/`
+- **p02** (downstream RHOAI builds): `https://api.stone-prod-p02.hjvn.p1.openshiftapps.com:6443/`
+
+See the [Konflux cluster info page](https://konflux.pages.redhat.com/docs/users/cluster-info/cluster-info.html) for the full list.
 
 ## Getting a Policy File
 
 The `ec validate image` command requires a `--policy` argument that tells it which rules to check against. You can specify this as:
 
-- **A Kubernetes reference** — use the policy name directly if you're logged into the Konflux cluster with `oc`: `--policy rhtap-releng-tenant/registry-rhoai-prod`
+- **A Kubernetes reference** — use the policy name directly if you're logged into the Konflux cluster with `kubectl`: `--policy rhtap-releng-tenant/registry-rhoai-prod`
 - **A local YAML file** — download the policy definition and reference it locally: `--policy registry-rhoai-prod.yaml`
 
-For RHOAI, the production release policy is `rhtap-releng-tenant/registry-rhoai-prod`. Its definition lives in [konflux-release-data](https://gitlab.cee.redhat.com/releng/konflux-release-data/-/blob/main/config/stone-prod-p02.hjvn.p1/product/EnterpriseContractPolicy/registry-rhoai-prod.yaml). You can download it from that GitLab URL or from the cluster with `oc`:
+For RHOAI, the production release policy is `rhtap-releng-tenant/registry-rhoai-prod`. Its definition lives in [konflux-release-data](https://gitlab.cee.redhat.com/releng/konflux-release-data/-/blob/main/config/stone-prod-p02.hjvn.p1/product/EnterpriseContractPolicy/registry-rhoai-prod.yaml). You can download it from that GitLab URL or from the cluster with `kubectl`:
 
 ```bash
-oc get enterprisecontractpolicy registry-rhoai-prod \
+kubectl get enterprisecontractpolicy registry-rhoai-prod \
   -n rhtap-releng-tenant -o yaml > registry-rhoai-prod.yaml
 ```
 
@@ -101,7 +118,7 @@ If a failure cannot be fixed immediately in the build (e.g., a known issue await
 1. Download the policy (see [Getting a Policy File](#getting-a-policy-file)):
 
 ```bash
-oc get enterprisecontractpolicy registry-rhoai-prod \
+kubectl get enterprisecontractpolicy registry-rhoai-prod \
   -n rhtap-releng-tenant -o yaml > registry-rhoai-prod-local.yaml
 ```
 
@@ -151,7 +168,7 @@ APPLICATION=rhoai-v3-4
 Snapshots are created by Konflux after successful builds or component changes. To find the most recent push snapshot for your application:
 
 ```bash
-oc get snapshots \
+kubectl get snapshots \
   -l "pac.test.appstudio.openshift.io/event-type notin (pull_request),appstudio.openshift.io/application=$APPLICATION" \
   --sort-by=.metadata.creationTimestamp
 ```
@@ -171,7 +188,7 @@ The label selectors filter for:
 To validate against the snapshot from the most recent release instead of the latest push snapshot, find it via the Release CR:
 
 ```bash
-SNAPSHOT=$(oc get releases \
+SNAPSHOT=$(kubectl get releases \
   -l "appstudio.openshift.io/application=$APPLICATION" \
   --sort-by=.metadata.creationTimestamp \
   -o jsonpath='{.items[-1:].spec.snapshot}')
@@ -194,7 +211,7 @@ You can also specify a snapshot directly without an application — the script w
 Download the snapshot as JSON and filter out FBC (File-Based Catalog) fragment components, which are not subject to the same policy checks:
 
 ```bash
-oc get snapshot $SNAPSHOT -o json \
+kubectl get snapshot $SNAPSHOT -o json \
   | jq '.spec.components |= [.[] | select(.name | test("fbc-fragment") | not)]' \
   > snapshot.json
 ```
@@ -202,7 +219,7 @@ oc get snapshot $SNAPSHOT -o json \
 To validate only specific components, add a regex filter on the component name. For example, to validate only components whose name contains `odh-notebook`:
 
 ```bash
-oc get snapshot $SNAPSHOT -o json \
+kubectl get snapshot $SNAPSHOT -o json \
   | jq '.spec.components |= [.[] | select(.name | test("fbc-fragment") | not)]
         | .spec.components |= [.[] | select(.name | test("odh-notebook"))]' \
   > snapshot.json
