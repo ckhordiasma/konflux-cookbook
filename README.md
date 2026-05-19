@@ -39,7 +39,7 @@ flowchart TD
         df[dockerfile-productization]
         df -- Hermetic Builds --> hp[hermeto-prefetch]
         hp -- if Python --> hpy[hermeto-python]
-        df -- if multi-arch --> bv[beaker-vm]
+        hp -- if multi-arch --> bv[beaker-vm]
         df -- FIPS compliance --> cp[check-payload]
     end
 
@@ -51,6 +51,7 @@ flowchart TD
     B ==> C
     C --> con2[conforma - validate snapshots/releases]
 
+    click df "guides/dockerfile-productization.md"
     click hp "guides/hermeto-prefetch.md"
     click hpy "guides/hermeto-python.md"
     click cp "guides/check-payload.md"
@@ -60,6 +61,7 @@ flowchart TD
     click crp "guides/create-pr-pipeline.md"
     click con1 "guides/conforma.md"
     click con2 "guides/conforma.md"
+    click C "guides/conforma.md"
 ```
 
 <details>
@@ -69,7 +71,7 @@ flowchart TD
   1. Productize your Dockerfile
      dockerfile-productization ──> hermeto-prefetch ──> hermeto-python (if Python)
                                ──> check-payload (FIPS compliance)
-                               ──> beaker-vm (if multi-arch, use throughout productization)
+                                                   ──> beaker-vm (if multi-arch)
               |
               v
   2. Deploy to Konflux

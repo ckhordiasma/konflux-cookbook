@@ -60,7 +60,7 @@ If a Dockerfile.konflux doesn't already exist, start by copying your existing Do
 cp Dockerfile Dockerfile.konflux    # or: cp Containerfile Dockerfile.konflux
 ```
 
-All subsequent changes in this guide (sourcing the hermeto env file, adding system packages to support hermetic installs, etc.) should be made in `Dockerfile.konflux`.
+All subsequent changes in this guide (sourcing the hermeto env file, adding system packages to support hermetic installs, etc.) should be made in `Dockerfile.konflux`. For the full set of productization changes needed in a Dockerfile.konflux (base image swaps, digest pinning, FIPS hardcoding, labels, etc.), see the [Dockerfile Productization guide](dockerfile-productization.md).
 
 ### Read the Dockerfile.konflux
 

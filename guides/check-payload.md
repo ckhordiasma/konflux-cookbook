@@ -278,3 +278,9 @@ Before pushing an image to Konflux, verify:
 - [ ] Base image is a FIPS-certified RHEL/UBI version
 - [ ] No statically linked binaries that perform cryptography
 - [ ] `check-payload scan local` passes (exit code 0)
+
+## What's Next
+
+- Fix FIPS issues in your Dockerfile.konflux — see [Go FIPS Builds](dockerfile-productization.md#go-fips-builds) and [FIPS Build Hardcoding](dockerfile-productization.md#fips-build-hardcoding).
+- Deploy your image to Konflux — see [deploying-to-konflux](deploying-to-konflux.md).
+- For Konflux-built images, run Conforma validation to check broader release policy compliance — see [conforma](conforma.md).

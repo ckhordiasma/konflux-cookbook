@@ -132,6 +132,8 @@ Remove any `ARG` declarations that are no longer needed after hardcoding. Keep a
 
 ## FIPS Compliance
 
+To verify that your image passes FIPS checks after making the changes below, see the [check-payload guide](check-payload.md) for running `check-payload` locally.
+
 ### FIPS Build Hardcoding
 
 Upstream Dockerfiles may have toggles for FIPS mode (e.g., `ARG FIPS_ENABLED=false`). Productized RHOAI builds need FIPS to be always enabled — remove the toggle and hardcode the FIPS-compliant path.
@@ -264,6 +266,18 @@ COPY --from=yq-builder /yq /usr/local/bin/yq
 
 The submodule's dependencies are prefetched along with the main project's dependencies via the hermeto config. See [odh-cli Dockerfile.konflux](https://github.com/red-hat-data-services/odh-cli/blob/f4e654f16c63300a9ba5e197e953aae26b41635c/Dockerfile.konflux) for the full pattern.
 
+## Multi-Architecture Builds
+
+RHOAI components typically target x86_64 and aarch64 initially, with ppc64le and s390x added later. Your local machine covers one architecture — for the others, use the [Beaker VM guide](beaker-vm.md) to provision test VMs on different CPU architectures.
+
+Key multi-arch concerns when productizing a Dockerfile:
+
+- **`--platform` on `FROM` lines** — Konflux builds natively on each architecture, so cross-compilation flags like `--platform=$BUILDPLATFORM` are not needed but won't break the build (see [details above](#removing---platform-from-from))
+- **Package availability varies by architecture** — check that any `microdnf install` packages are available on all targets. Some packages in the standard UBI repos are not available on ppc64le or s390x.
+- **Python packages may lack wheels for some architectures** — ppc64le and s390x commonly lack pre-built wheels. See the [hermeto Python guide](hermeto-python.md) for using AIPCC wheels or building from source on those architectures.
+
+Once your Dockerfile.konflux is productized, the [hermeto guide's remote testing section](hermeto-prefetch.md#testing-on-remote-architectures) covers syncing your project to a remote host and running the full hermetic build there.
+
 ## Checklist
 
 Use this as a quick reference when creating or reviewing a `Dockerfile.konflux`:
@@ -280,3 +294,9 @@ Use this as a quick reference when creating or reviewing a `Dockerfile.konflux`:
 - [ ] `ubi9-minimal` used instead of `ubi9-micro` if any `RUN` instructions exist
 - [ ] Dockerfile placed and named correctly for the repo structure
 - [ ] `. /cachi2/cachi2.env` is NOT committed in the Dockerfile (pipeline injects it automatically)
+
+## What's Next
+
+- **Set up hermetic builds** — prefetch dependencies so your build works offline. See [hermeto-prefetch](hermeto-prefetch.md).
+- **Verify FIPS compliance** — run check-payload locally to catch issues before they block a release. See [check-payload](check-payload.md).
+- **Deploy to Konflux** — get your productized Dockerfile into actual Konflux pipelines. See [deploying-to-konflux](deploying-to-konflux.md).

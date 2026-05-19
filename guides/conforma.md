@@ -210,3 +210,32 @@ Check the exit code of the `ec` command:
 - **non-zero** -- one or more components failed
 
 The YAML output contains per-component results. Look for components with failures to understand what policy rules they violated.
+
+## Validate Release Policy
+
+Before images ship through a release pipeline, they must pass Conforma validation. Conforma checks happen at two points in the RHOAI release process:
+
+1. **During development** — manually run `ec validate image` against PR build images to catch policy issues early (see [Option A](#option-a-validate-a-single-image) above). The [deploying-to-konflux guide](deploying-to-konflux.md) walks through this as part of both the midstream ODH and downstream RHDS deployment workflows.
+
+2. **At release time** — Conforma runs automatically via IntegrationTestScenario on release branches. Failures at this stage block the release. Use [Option B](#option-b-validate-a-full-snapshot) to debug which components are failing and why.
+
+Running validation early — during PR builds — avoids surprises at release time. If you're deploying a new component or making significant build changes, validate before merging to the release branch.
+
+## Fixing Conforma Failures
+
+Conforma failures mean an image doesn't meet productization standards. The fix is almost always in the image build itself, not in Conforma configuration. Use `--verbose` with `ec validate image` to see exactly which policy rule failed.
+
+Common failure categories and where to fix them:
+
+| Failure area | What it means | Where to fix |
+|-------------|---------------|--------------|
+| Missing or invalid image signature | Image wasn't built through a Konflux pipeline | Locally-built images cannot pass — the image must be built by Konflux. See [deploying-to-konflux](deploying-to-konflux.md). |
+| Missing attestation or SBOM | Prefetch configuration is incomplete or hermetic build is not enabled | Review your `prefetch-input` and set `hermetic: true`. See [hermeto-prefetch](hermeto-prefetch.md). |
+| FIPS compliance | Go binary missing FIPS flags, or non-certified crypto libraries in the image | Run [check-payload](check-payload.md) locally to diagnose, then fix in your Dockerfile.konflux per the [FIPS section](dockerfile-productization.md#fips-compliance). |
+| Base image not from approved source | Using community images instead of UBI/RHEL | Switch to UBI base images. See [Base Image Changes](dockerfile-productization.md#base-image-changes). |
+| Base image not pinned by digest | `FROM` line uses a floating tag | Pin by digest. See [Base Image Pinning](dockerfile-productization.md#base-image-pinning-by-digest). |
+
+## See Also
+
+- [Deploying Hermetic Build Config to Konflux](deploying-to-konflux.md) — the deployment workflow that uses Conforma validation at multiple stages.
+- [check-payload](check-payload.md) — local FIPS compliance checking, complementary to Conforma's broader policy validation.

@@ -460,3 +460,8 @@ uv pip compile pyproject.toml \
 If you need a specific RC version, pin it explicitly in your constraints instead of using `--prerelease=allow` globally.
 
 **Diagnosis:** When a multi-arch build fails with `No matching distribution found` for a package with an RC version number, check whether the AIPCC index has that version for all target architectures. Browse the index at `https://packages.redhat.com/api/pypi/public-rhai/rhoai/{release}/{variant}/simple/{package}/` and look for wheels with your failing architecture's platform tag (e.g., `linux_s390x`).
+
+## What's Next
+
+- Return to the [main hermeto guide](hermeto-prefetch.md#building-with-prefetched-dependencies) for building with prefetched dependencies and testing locally.
+- Deploy your hermetic build config to Konflux — see [deploying-to-konflux](deploying-to-konflux.md).
