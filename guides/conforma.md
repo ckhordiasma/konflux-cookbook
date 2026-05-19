@@ -20,14 +20,27 @@ This means you can run conforma against images built by a Konflux pipeline (push
 ## Prerequisites
 
 You need the following tools installed and configured:
-[todo need to specify that oc is also needed if the policy you are referencing is on the cluster]
-- **`oc`** -- OpenShift CLI, logged into the Konflux cluster (only needed for snapshot-based validation)
+- **`oc`** -- OpenShift CLI, logged into the Konflux cluster
 - **`ec`** -- [Enterprise Contract CLI](https://github.com/enterprise-contract/ec-cli)
 - **`jq`** -- JSON processor (only needed for snapshot-based validation)
 
-## Option A: Validate a single image
+## Getting a Policy File
 
-If you just want to check one container image against a policy, you can skip the snapshot steps entirely.
+The `ec validate image` command requires a `--policy` argument that tells it which rules to check against. You can specify this as:
+
+- **A Kubernetes reference** — use the policy name directly if you're logged into the Konflux cluster with `oc`: `--policy rhtap-releng-tenant/registry-rhoai-prod`
+- **A local YAML file** — download the policy definition and reference it locally: `--policy registry-rhoai-prod.yaml`
+
+For RHOAI, the production release policy is `rhtap-releng-tenant/registry-rhoai-prod`. Its definition lives in [konflux-release-data](https://gitlab.cee.redhat.com/releng/konflux-release-data/-/blob/main/config/stone-prod-p02.hjvn.p1/product/EnterpriseContractPolicy/registry-rhoai-prod.yaml). You can download it from that GitLab URL or from the cluster with `oc`:
+
+```bash
+oc get enterprisecontractpolicy registry-rhoai-prod \
+  -n rhtap-releng-tenant -o yaml > registry-rhoai-prod.yaml
+```
+
+## Validate a Single Image
+
+Use this when onboarding a new component or testing build changes — validate the image from your PR build to catch policy issues before merging. To validate all components in an application at once, see [Appendix: Validate a Full Snapshot](#appendix-validate-a-full-snapshot).
 
 ### 1. Run EC validation against the image
 
@@ -53,11 +66,77 @@ Check the exit code:
 
 The YAML output contains the detailed results. Add `--verbose` for more detail when debugging failures.
 
----
+If your image didn't pass, see [Fixing Conforma Failures](#fixing-conforma-failures).
 
-## Option B: Validate a full snapshot
+## Validate Release Policy
 
-Use this when you want to validate all components in a Konflux application at once.
+Before images ship through a release pipeline, they must pass Conforma validation. Conforma checks happen at two points in the RHOAI release process:
+
+The RHOAI production release policy is `rhtap-releng-tenant/registry-rhoai-prod` on the Konflux cluster. Its definition lives in [konflux-release-data](https://gitlab.cee.redhat.com/releng/konflux-release-data/-/blob/main/config/stone-prod-p02.hjvn.p1/product/EnterpriseContractPolicy/registry-rhoai-prod.yaml).
+
+1. **During development** — manually run `ec validate image` against PR build images to catch policy issues early (see [Validate a Single Image](#validate-a-single-image) above).
+
+2. **At release time** — Conforma runs automatically via IntegrationTestScenario on release branches. Failures at this stage block the release. The DevOps team can use [Validate a Full Snapshot](#appendix-validate-a-full-snapshot) to debug which components are failing and why.
+
+Running validation early — during PR builds — avoids surprises at release time. If you're deploying a new component or making significant build changes, validate before merging to the release branch.
+
+## Fixing Conforma Failures
+
+Conforma failures mean an image doesn't meet productization standards. The fix is typically in the image build itself. Use `--verbose` with `ec validate image` to see exactly which policy rule failed.
+
+Some examples of failure categories and where to fix them:
+
+| Failure area | What it means | Where to fix |
+|-------------|---------------|--------------|
+| Missing or invalid image signature | Image wasn't built through a Konflux pipeline | Locally-built images cannot pass — the image must be built by Konflux. See [deploying-to-konflux](deploying-to-konflux.md). |
+| Missing attestation or SBOM | Prefetch configuration is incomplete or hermetic build is not enabled | Review your `prefetch-input` and set `hermetic: true`. See [hermeto-prefetch](hermeto-prefetch.md). |
+| FIPS compliance | Go binary missing FIPS flags, or non-certified crypto libraries in the image | Run [check-payload](check-payload.md) locally to diagnose, then fix in your Dockerfile.konflux per the [FIPS section](dockerfile-productization.md#fips-compliance). |
+| Base image not from approved source | Using community images instead of UBI/RHEL | Switch to UBI base images. See [Base Image Changes](dockerfile-productization.md#base-image-changes). |
+| Base image not pinned by digest | `FROM` line uses a floating tag | Pin by digest. See [Base Image Pinning](dockerfile-productization.md#base-image-pinning-by-digest). |
+
+### Testing with policy exceptions locally
+
+If a failure cannot be fixed immediately in the build (e.g., a known issue awaiting an upstream fix), you can test whether a policy exception would let your component pass. Download the production policy, add an exception, and re-validate locally:
+
+1. Download the policy (see [Getting a Policy File](#getting-a-policy-file)):
+
+```bash
+oc get enterprisecontractpolicy registry-rhoai-prod \
+  -n rhtap-releng-tenant -o yaml > registry-rhoai-prod-local.yaml
+```
+
+2. Edit `registry-rhoai-prod-local.yaml` to add an exception for the failing rule. Exceptions are added under `spec.configuration.exclude`:
+
+```yaml
+spec:
+  configuration:
+    exclude:
+      - "step_image_registries"   # example: skip the base image registry check
+```
+
+3. Re-run validation with the modified policy:
+
+```bash
+ec validate image \
+  --ignore-rekor true \
+  --image <your-image> \
+  --public-key k8s://openshift-pipelines/public-key \
+  --policy registry-rhoai-prod-local.yaml \
+  --info \
+  --output yaml \
+  --timeout 30m0s
+```
+
+This lets you verify that adding a specific exception would unblock your component locally. **Policy exceptions require approval from both release engineering and RHOAI product management.** The actual exception must be added to the production policy in [konflux-release-data](https://gitlab.cee.redhat.com/releng/konflux-release-data/-/blob/main/config/stone-prod-p02.hjvn.p1/product/EnterpriseContractPolicy/registry-rhoai-prod.yaml) — you cannot self-service approve MRs to this file. Always prefer fixing the underlying build issue over requesting an exception.
+
+## See Also
+
+- [Deploying Hermetic Build Config to Konflux](deploying-to-konflux.md) — the deployment workflow that uses Conforma validation at multiple stages.
+- [check-payload](check-payload.md) — local FIPS compliance checking, complementary to Conforma's broader policy validation.
+
+## Appendix: Validate a Full Snapshot
+
+Use this when you need to validate all components in a Konflux application at once — typically for DevOps teams testing an entire release.
 
 ### 1. Choose your application
 
@@ -145,18 +224,7 @@ jq -r '.spec.application' snapshot.json
 
 This should print your application name. If it doesn't match, you grabbed the wrong snapshot.
 
-### 5. Choose a policy
-
-EC validates images against a policy configuration. Policies can be specified as:
-
-- **A local YAML file** -- e.g. `registry-rhoai-prod.yaml`
-- **A Kubernetes reference** -- e.g. `k8s://tekton-chains/policy`
-
-```bash
-POLICY=registry-rhoai-prod.yaml
-```
-
-### 6. Run EC validation
+### 5. Run EC validation
 
 Run `ec validate image` against the snapshot:
 
@@ -180,7 +248,7 @@ Flag reference:
 | `--workers 50` | Number of concurrent validation workers (increase for large snapshots) |
 | `--file-path` | Path to the snapshot JSON file |
 | `--public-key` | Public key used to verify image signatures. `k8s://openshift-pipelines/public-key` references a secret in the cluster |
-| `--policy` | Policy configuration to validate against |
+| `--policy` | Policy configuration to validate against (see [Getting a Policy File](#getting-a-policy-file)) |
 | `--info` | Include informational (non-blocking) results |
 | `--output yaml` | Output format |
 | `--timeout 30m0s` | Timeout for the entire validation run |
@@ -202,7 +270,7 @@ ec validate image \
 
 Add `--verbose` for detailed output, which is helpful when debugging specific policy failures.
 
-### 7. Review the results
+### 6. Review the results
 
 Check the exit code of the `ec` command:
 
@@ -210,34 +278,3 @@ Check the exit code of the `ec` command:
 - **non-zero** -- one or more components failed
 
 The YAML output contains per-component results. Look for components with failures to understand what policy rules they violated.
-
-## Validate Release Policy
-
-Before images ship through a release pipeline, they must pass Conforma validation. Conforma checks happen at two points in the RHOAI release process:
-
-[TODO need to give some information on what the RHOAI specific release policies are]
-
-1. **During development** — manually run `ec validate image` against PR build images to catch policy issues early (see [Option A](#option-a-validate-a-single-image) above). The [deploying-to-konflux guide](deploying-to-konflux.md) walks through this as part of both the midstream ODH and downstream RHDS deployment workflows. [TODO I don't get how this second sentence is relevant]
-
-2. **At release time** — Conforma runs automatically via IntegrationTestScenario on release branches. Failures at this stage block the release. The DevOps team can use [Option B](#option-b-validate-a-full-snapshot) to debug which components are failing and why.
-
-Running validation early — during PR builds — avoids surprises at release time. If you're deploying a new component or making significant build changes, validate before merging to the release branch.
-
-## Fixing Conforma Failures
-
-Conforma failures mean an image doesn't meet productization standards. The fix is typically in the image build itself. Use `--verbose` with `ec validate image` to see exactly which policy rule failed.
-
-Some examples of failure categories and where to fix them:
-
-| Failure area | What it means | Where to fix |
-|-------------|---------------|--------------|
-| Missing or invalid image signature | Image wasn't built through a Konflux pipeline | Locally-built images cannot pass — the image must be built by Konflux. See [deploying-to-konflux](deploying-to-konflux.md). |
-| Missing attestation or SBOM | Prefetch configuration is incomplete or hermetic build is not enabled | Review your `prefetch-input` and set `hermetic: true`. See [hermeto-prefetch](hermeto-prefetch.md). |
-| FIPS compliance | Go binary missing FIPS flags, or non-certified crypto libraries in the image | Run [check-payload](check-payload.md) locally to diagnose, then fix in your Dockerfile.konflux per the [FIPS section](dockerfile-productization.md#fips-compliance). |
-| Base image not from approved source | Using community images instead of UBI/RHEL | Switch to UBI base images. See [Base Image Changes](dockerfile-productization.md#base-image-changes). |
-| Base image not pinned by digest | `FROM` line uses a floating tag | Pin by digest. See [Base Image Pinning](dockerfile-productization.md#base-image-pinning-by-digest). |
-
-## See Also
-
-- [Deploying Hermetic Build Config to Konflux](deploying-to-konflux.md) — the deployment workflow that uses Conforma validation at multiple stages.
-- [check-payload](check-payload.md) — local FIPS compliance checking, complementary to Conforma's broader policy validation.
