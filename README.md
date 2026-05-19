@@ -32,14 +32,16 @@ The guides build on each other. Start at the top and work down.
 
 ```mermaid
 flowchart TD
-    A["1. Productize your Dockerfile"]
-    B["2. Deploy to Konflux"]
-    C["3. Validate release policy"]
+    B["Deploy to Konflux"]
+    C["Validate release policy"]
 
-    A -- hermeto-prefetch --> hp[hermeto-prefetch]
-    hp -- if Python --> hpy[hermeto-python]
-    A -- FIPS compliance --> cp[check-payload]
-    A -- if multi-arch --> bv[beaker-vm]
+    subgraph A["Productize your Dockerfile"]
+        df[dockerfile-productization]
+        df -- Hermetic Builds --> hp[hermeto-prefetch]
+        hp -- if Python --> hpy[hermeto-python]
+        df -- if multi-arch --> bv[beaker-vm]
+        df -- FIPS compliance --> cp[check-payload]
+    end
 
     A ==> B
 
