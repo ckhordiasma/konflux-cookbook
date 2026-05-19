@@ -20,7 +20,7 @@ This means you can run conforma against images built by a Konflux pipeline (push
 ## Prerequisites
 
 You need the following tools installed and configured:
-
+[todo need to specify that oc is also needed if the policy you are referencing is on the cluster]
 - **`oc`** -- OpenShift CLI, logged into the Konflux cluster (only needed for snapshot-based validation)
 - **`ec`** -- [Enterprise Contract CLI](https://github.com/enterprise-contract/ec-cli)
 - **`jq`** -- JSON processor (only needed for snapshot-based validation)
@@ -215,17 +215,19 @@ The YAML output contains per-component results. Look for components with failure
 
 Before images ship through a release pipeline, they must pass Conforma validation. Conforma checks happen at two points in the RHOAI release process:
 
-1. **During development** — manually run `ec validate image` against PR build images to catch policy issues early (see [Option A](#option-a-validate-a-single-image) above). The [deploying-to-konflux guide](deploying-to-konflux.md) walks through this as part of both the midstream ODH and downstream RHDS deployment workflows.
+[TODO need to give some information on what the RHOAI specific release policies are]
 
-2. **At release time** — Conforma runs automatically via IntegrationTestScenario on release branches. Failures at this stage block the release. Use [Option B](#option-b-validate-a-full-snapshot) to debug which components are failing and why.
+1. **During development** — manually run `ec validate image` against PR build images to catch policy issues early (see [Option A](#option-a-validate-a-single-image) above). The [deploying-to-konflux guide](deploying-to-konflux.md) walks through this as part of both the midstream ODH and downstream RHDS deployment workflows. [TODO I don't get how this second sentence is relevant]
+
+2. **At release time** — Conforma runs automatically via IntegrationTestScenario on release branches. Failures at this stage block the release. The DevOps team can use [Option B](#option-b-validate-a-full-snapshot) to debug which components are failing and why.
 
 Running validation early — during PR builds — avoids surprises at release time. If you're deploying a new component or making significant build changes, validate before merging to the release branch.
 
 ## Fixing Conforma Failures
 
-Conforma failures mean an image doesn't meet productization standards. The fix is almost always in the image build itself, not in Conforma configuration. Use `--verbose` with `ec validate image` to see exactly which policy rule failed.
+Conforma failures mean an image doesn't meet productization standards. The fix is typically in the image build itself. Use `--verbose` with `ec validate image` to see exactly which policy rule failed.
 
-Common failure categories and where to fix them:
+Some examples of failure categories and where to fix them:
 
 | Failure area | What it means | Where to fix |
 |-------------|---------------|--------------|
