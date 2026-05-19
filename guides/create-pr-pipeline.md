@@ -218,3 +218,8 @@ If using `on-event: "[pull_request]"`, the build triggers automatically when you
 ## Cleanup
 
 Remove the `.tekton/<component>-pull-request.yaml` file before merging your PR (or in a follow-up revert commit), since it's only needed for testing.
+
+## See Also
+
+- [Deploying Hermetic Build Config to Konflux](deploying-to-konflux.md) — the full deployment workflow that references this guide.
+- [Conforma](conforma.md) — validate your PR build image against release policy to catch issues before merging.

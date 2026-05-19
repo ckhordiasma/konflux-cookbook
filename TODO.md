@@ -1,25 +1,24 @@
 # Guides TODO
 
-## Prerequisites
 
-- [ ] Getting a local build working on x86 or arm before moving to Konflux
 
-## Multi-Arch
+## Hermetic Builds — Open Questions
 
-- [ ] Provisioning Power/Z architecture hardware on Beaker
 
-## Hermetic Builds with Hermeto
+## Dockerfile.konflux Productization best practices 
 
-- [ ] Using Hermeto locally to prefetch dependencies, and modifying your build to consume prefetched dependencies
-- [ ] Running Hermeto as a container (for environments where you can't install it directly)
-- [ ] Python-specific Hermeto gotchas
-- [ ] RPM-specific Hermeto gotchas
-- [ ] Leveraging AIPCC Python wheel releases
+- [x] Guide on creating a Dockerfile.konflux from an upstream Dockerfile — see [dockerfile-productization.md](guides/dockerfile-productization.md)
+- [ ] Renovate guide -- how Renovate auto-updates pinned base image digests in Dockerfiles, and how this interacts with build-arg patterns (currently Renovate scans `FROM` lines for digest pins, so switching to `ARG BASE_IMAGE=...@sha256:...` + `FROM ${BASE_IMAGE}` may require renovate config changes to keep automated updates working)
+- [ ] Expand digest pinning section in `dockerfile-productization.md` to cover strategies for renovating an argfile (build-arg file) instead of the Dockerfile itself — e.g., having Renovate update a `.build-args` file that the pipeline passes via `build-arg-file`, so the Dockerfile stays clean and all version pins live in one place
+
+## FIPS Compliance
+
+- [x] Guide on running check-payload locally to detect FIPS issues before pushing to Konflux — see [check-payload.md](guides/check-payload.md)
 
 ## Conforma Compliance
 
 - [ ] Getting your build to pass Conforma compliance checks
 
-## Validating with Konflux PR Builds
+## Skills
 
-- [ ] Creating a temporary pull request pipeline to test builds before merging (see existing guide: `create-pr-pipeline`)
+- [ ] Generalize `refine-guide-hermeto` into a generic `refine-guide` skill — the structure (clone repo, parse pipelines, compare implementation to guide, propose edits) works for any guide. Extract hermeto-specific logic (package manager enumeration, prefetch-input parsing) into parameters.
